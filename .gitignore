@@ -1,0 +1,5 @@
+.venv/
+_output/
+.jupyterlite.doit.db
+__pycache__/
+*.pyc
