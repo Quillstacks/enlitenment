@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>enlitenment — Interactive Lecture Notebooks</title>
+  <style>
+    :root {
+      --fg: #1a1a1a;
+      --bg: #fafaf8;
+      --accent: #2d6a4f;
+      --muted: #6b7280;
+      --border: #e5e5e5;
+      --card-bg: #ffffff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.1rem;
+      margin-bottom: 2.5rem;
+    }
+
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .advice-list {
+      list-style: none;
+      margin-bottom: 2rem;
+    }
+
+    .advice-list li {
+      padding: 0.6rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-start;
+    }
+
+    .advice-list li:last-child { border-bottom: none; }
+
+    .icon {
+      flex-shrink: 0;
+      width: 1.5rem;
+      text-align: center;
+      font-size: 1.1rem;
+    }
+
+    .courses {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin: 1.5rem 0 2.5rem;
+    }
+
+    .course-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      text-decoration: none;
+      color: var(--fg);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .course-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .course-card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .course-card p {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .enter-btn {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      text-decoration: none;
+      padding: 0.75rem 2rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+
+    .enter-btn:hover { background: #245a42; }
+
+    .note {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #fef9e7;
+      border-left: 3px solid #f0c040;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    footer {
+      margin-top: 3rem;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    @media (max-width: 520px) {
+      .courses { grid-template-columns: 1fr; }
+      h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>enlitenment</h1>
+    <p class="subtitle">Interactive lecture notebooks — run entirely in your browser.</p>
+
+    <h2>Before you start</h2>
+    <ul class="advice-list">
+      <li>
+        <span class="icon">&#x1F310;</span>
+        <span><strong>Use Chrome or Firefox on a laptop.</strong> Safari works but is slower. Mobile devices are not recommended — the Python runtime needs ~30 MB of memory.</span>
+      </li>
+      <li>
+        <span class="icon">&#x23F3;</span>
+        <span><strong>First load takes 10–20 seconds.</strong> A Python environment is being set up inside your browser. Subsequent visits are faster thanks to caching.</span>
+      </li>
+      <li>
+        <span class="icon">&#x1F4BE;</span>
+        <span><strong>Your work is saved in your browser only.</strong> If you clear your cache or switch browsers, your progress is lost. Use <em>File &rarr; Download</em> to save a copy of your notebook.</span>
+      </li>
+      <li>
+        <span class="icon">&#x1F4E5;</span>
+        <span><strong>Save &amp; resume.</strong> At the end of each session, use <em>File &rarr; Download</em> to save your notebook. Next time, upload it via the file browser to continue where you left off.</span>
+      </li>
+      <li>
+        <span class="icon">&#x25B6;</span>
+        <span><strong>Run cells top to bottom.</strong> Later cells depend on earlier ones. If something breaks, restart the kernel and run all cells again.</span>
+      </li>
+    </ul>
+
+    <h2>Courses</h2>
+    <div class="courses">
+      <a class="course-card" href="notebooks/tree/numerical-methods">
+        <h3>Numerical Methods</h3>
+        <p>Grid search, floating point, error analysis, root finding, optimization, integration</p>
+      </a>
+      <a class="course-card" href="notebooks/tree/unsupervised-deep-learning">
+        <h3>Unsupervised Deep Learning</h3>
+        <p>Distance measures, similarity, normalization</p>
+      </a>
+    </div>
+
+    <a class="enter-btn" href="notebooks/">Open Notebook Environment</a>
+
+    <div class="note">
+      <strong>Trouble?</strong> If the notebooks won't load, try a hard refresh (<code>Ctrl+Shift+R</code>) or switch to Chrome. If a cell produces an error, check that you ran all previous cells first.
+    </div>
+
+    <footer>
+      Powered by JupyterLite &mdash; no server-side computation, everything runs locally in your browser.
+      <br><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" style="color:var(--muted);text-decoration:none;font-size:0.7rem;">Solutions</a>
+    </footer>
+  </div>
+</body>
+</html>

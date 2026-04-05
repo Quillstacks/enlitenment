@@ -9,4 +9,5 @@ fi
 
 source .venv/bin/activate
 pip install -q -r requirements.txt
-jupyter lite build --contents content --output-dir _output
+jupyter lite build --contents content --output-dir _output/notebooks
+cp landing/index.html _output/index.html
