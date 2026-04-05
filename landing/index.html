@@ -5,58 +5,113 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>enlitenment — Interactive Lecture Notebooks</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@300;400;500&display=swap" rel="stylesheet">
   <style>
+    @font-face {
+      font-family: 'Geist Mono';
+      src: local('Geist Mono'), local('GeistMono');
+      font-weight: 400;
+      font-display: swap;
+    }
+
     :root {
-      --fg: #1a1a1a;
-      --bg: #fafaf8;
-      --accent: #2d6a4f;
-      --muted: #6b7280;
-      --border: #e5e5e5;
-      --card-bg: #ffffff;
+      --color-bg: #222222;
+      --color-surface: #264653;
+      --color-border: #2e5a6a;
+      --color-accent: #2a9d8f;
+      --color-near-black: #e9c46a;
+      --color-gray-mid: #f4a261;
+      --color-gray-tertiary: #e76f51;
+      --color-text: #c4bfb9;
+      --font-sans: 'EB Garamond', Palatino, "Book Antiqua", Georgia, serif;
+      --font-mono: 'Geist Mono', ui-monospace, SFMono-Regular, monospace;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      color: var(--fg);
-      background: var(--bg);
-      line-height: 1.6;
+      font-family: var(--font-sans);
+      color: var(--color-text);
+      background: var(--color-bg);
+      font-size: 1.0625rem;
+      line-height: 1.7;
+      font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "onum" 1;
+    }
+
+    /* -- Animations -- */
+    @keyframes fade-slide-in {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in {
+      opacity: 0;
+      animation: fade-slide-in 0.7s ease-out forwards;
     }
 
     .container {
       max-width: 720px;
       margin: 0 auto;
-      padding: 3rem 1.5rem;
+      padding: 4rem 1.5rem;
     }
 
+    /* -- Typography -- */
     h1 {
-      font-size: 2rem;
-      font-weight: 600;
-      margin-bottom: 0.25rem;
+      font-family: var(--font-sans);
+      font-size: 2.8rem;
+      font-weight: 300;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-near-black);
+      margin-bottom: 0.35rem;
     }
 
     .subtitle {
-      color: var(--muted);
-      font-size: 1.1rem;
-      margin-bottom: 2.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--color-gray-tertiary);
+      margin-bottom: 3.5rem;
     }
 
     h2 {
-      font-size: 1.25rem;
-      font-weight: 600;
-      margin-top: 2rem;
+      font-family: var(--font-sans);
+      font-size: 1.35rem;
+      font-weight: 400;
+      color: var(--color-near-black);
       margin-bottom: 0.75rem;
     }
 
+    /* -- Divider -- */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 3rem;
+      margin-bottom: 1.25rem;
+    }
+    .divider-line {
+      flex: 1;
+      height: 1px;
+      background: var(--color-border);
+    }
+    .divider-label {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-gray-tertiary);
+    }
+
+    /* -- Advice list -- */
     .advice-list {
       list-style: none;
-      margin-bottom: 2rem;
+      margin-bottom: 0.5rem;
     }
 
     .advice-list li {
-      padding: 0.6rem 0;
-      border-bottom: 1px solid var(--border);
+      padding: 0.7rem 0;
+      border-bottom: 1px solid var(--color-border);
       display: flex;
       gap: 0.75rem;
       align-items: flex-start;
@@ -71,81 +126,150 @@
       font-size: 1.1rem;
     }
 
+    .advice-list strong {
+      color: var(--color-gray-mid);
+    }
+
+    .advice-list code {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--color-gray-tertiary);
+      background: var(--color-surface);
+      padding: 0.1em 0.35em;
+    }
+
+    .advice-list em {
+      font-style: normal;
+      color: var(--color-text);
+    }
+
+    /* -- Course cards -- */
     .courses {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1rem;
-      margin: 1.5rem 0 2.5rem;
+      margin: 1.25rem 0 3rem;
     }
 
     .course-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 0;
       padding: 1.25rem;
       text-decoration: none;
-      color: var(--fg);
-      transition: border-color 0.15s, box-shadow 0.15s;
+      color: var(--color-text);
+      transition: all 0.15s;
     }
 
     .course-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transform: scale(1.03);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    .course-card:active {
+      transform: scale(0.98);
     }
 
     .course-card h3 {
+      font-family: var(--font-sans);
       font-size: 1rem;
-      font-weight: 600;
-      margin-bottom: 0.25rem;
+      font-weight: 500;
+      color: var(--color-near-black);
+      margin-bottom: 0.35rem;
     }
 
     .course-card p {
-      font-size: 0.85rem;
-      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      color: var(--color-gray-tertiary);
+      line-height: 1.5;
     }
 
+    /* -- CTA button -- */
     .enter-btn {
       display: inline-block;
-      background: var(--accent);
+      background: var(--color-accent);
       color: #fff;
       text-decoration: none;
-      padding: 0.75rem 2rem;
-      border-radius: 6px;
+      padding: 0.75rem 1.75rem;
+      border-radius: 0;
+      font-family: var(--font-sans);
       font-size: 1rem;
       font-weight: 500;
-      transition: background 0.15s;
+      transition: all 0.15s;
     }
 
-    .enter-btn:hover { background: #245a42; }
+    .enter-btn:hover { opacity: 0.9; }
+    .enter-btn:active { transform: scale(0.95); }
 
+    /* -- Note box -- */
     .note {
-      margin-top: 2rem;
-      padding: 1rem;
-      background: #fef9e7;
-      border-left: 3px solid #f0c040;
-      border-radius: 4px;
+      margin-top: 3rem;
+      padding: 1rem 1.25rem;
+      background: var(--color-surface);
+      border-left: 3px solid var(--color-gray-mid);
+      border-radius: 0;
       font-size: 0.9rem;
     }
 
+    .note strong {
+      color: var(--color-gray-mid);
+    }
+
+    .note code {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--color-gray-tertiary);
+    }
+
+    /* -- Footer -- */
     footer {
-      margin-top: 3rem;
-      color: var(--muted);
-      font-size: 0.8rem;
+      margin-top: 3.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.625rem;
+      letter-spacing: 0.04em;
+      color: var(--color-gray-tertiary);
+      line-height: 1.8;
+    }
+
+    footer a {
+      color: var(--color-gray-tertiary);
+      text-decoration: none;
+      border-bottom: 1px solid var(--color-border);
+      transition: border-color 0.15s;
+    }
+
+    footer a:hover {
+      border-color: var(--color-accent);
+    }
+
+    /* -- Responsive -- */
+    @media (min-width: 640px) {
+      h1 { font-size: 3.2rem; }
     }
 
     @media (max-width: 520px) {
       .courses { grid-template-columns: 1fr; }
-      h1 { font-size: 1.5rem; }
+      h1 { font-size: 2.2rem; }
+      .container { padding: 2.5rem 1.25rem; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>enlitenment</h1>
-    <p class="subtitle">Combobulated by Prof. Dr.-Ing. Mark Schutera</p>
 
-    <h2>Before you start</h2>
-    <ul class="advice-list">
+    <div class="animate-in" style="animation-delay: 0ms;">
+      <h1>enlitenment</h1>
+      <p class="subtitle">Combobulated by Prof. Dr.-Ing. Mark Schutera</p>
+    </div>
+
+    <div class="divider animate-in" style="animation-delay: 120ms;">
+      <div class="divider-line"></div>
+      <span class="divider-label">Before you start</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <ul class="advice-list animate-in" style="animation-delay: 200ms;">
       <li>
         <span class="icon">&#x1F310;</span>
         <span><strong>Use Chrome or Firefox on a laptop.</strong> Safari works but is slower. Mobile devices are not recommended — the Python runtime needs ~30 MB of memory.</span>
@@ -168,29 +292,37 @@
       </li>
     </ul>
 
-    <h2>Courses</h2>
+    <div class="divider animate-in" style="animation-delay: 350ms;">
+      <div class="divider-line"></div>
+      <span class="divider-label">Courses</span>
+      <div class="divider-line"></div>
+    </div>
+
     <div class="courses">
-      <a class="course-card" href="/tree/numerical-methods/">
+      <a class="course-card animate-in" style="animation-delay: 450ms;" href="/">
         <h3>Numerical Methods</h3>
-        <p>Grid search, floating point, error analysis, root finding, optimization, integration</p>
+        <p>This course will teach you everything you need to know to become proficient with numerical methods, and how to put them to good use in machine learning, data science, and engineering contexts.</p>
       </a>
-      <a class="course-card" href="/tree/unsupervised-deep-learning/">
+      <a class="course-card animate-in" style="animation-delay: 540ms;" href="/">
         <h3>Unsupervised Deep Learning</h3>
-        <p>Distance measures, similarity, normalization</p>
+        <p>We will see how patterns can be discovered in data, represented, leveraged and utilized. In that sense this course is about any form of learning that is not supervised learning.</p>
       </a>
     </div>
 
-    <a class="enter-btn" href="/">Open Notebook Environment</a>
-
-    <div class="note">
-      <strong>Trouble?</strong> If the notebooks won't load, try a hard refresh (<code>Ctrl+Shift+R</code>) or switch to Chrome. If a cell produces an error, check that you ran all previous cells first.
+    <div class="animate-in" style="animation-delay: 650ms;">
+      <a class="enter-btn" href="/">Open Notebook Environment</a>
     </div>
 
-    <footer>
-      Contact: <a href="mailto:schutera@dhbw-ravensburg.de" style="color:var(--muted);">schutera@dhbw-ravensburg.de</a>
+    <div class="note animate-in" style="animation-delay: 800ms;">
+      <strong>Trouble?</strong> Lecture notes and slides live at <a href="https://github.com/Quillstacks/LectureMaterial/tree/main/lecturenotes" style="color:var(--color-near-black);border-bottom:1px solid var(--color-border);">Quillstacks/LectureMaterial</a>. If notebooks won't load, try a hard refresh (<code>Ctrl+Shift+R</code>) or switch to Chrome.
+    </div>
+
+    <footer class="animate-in" style="animation-delay: 950ms;">
+      Contact: <a href="mailto:schutera@dhbw-ravensburg.de">schutera@dhbw-ravensburg.de</a>
       <br>Powered by JupyterLite &mdash; no server-side computation, everything runs locally in your browser.
-      <br><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" style="color:var(--muted);text-decoration:none;font-size:0.7rem;">Solutions</a>
+      <br><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" style="font-size:0.55rem;border:none;">Solutions</a>
     </footer>
+
   </div>
 </body>
 </html>

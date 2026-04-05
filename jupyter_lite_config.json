@@ -1,6 +1,7 @@
 {
   "LiteBuildConfig": {
     "contents": ["content"],
-    "output_dir": "_output"
+    "output_dir": "_output",
+    "settings_overrides": ["overrides.json"]
   }
 }

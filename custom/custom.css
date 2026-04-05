@@ -1,0 +1,165 @@
+/*
+ * Custom JupyterLab theme — matches enlitenment landing page palette.
+ * Loaded via jupyter_lite_config.json custom_css setting.
+ *
+ * Palette:
+ *   bg:       #222222    surface:  #264653    border:   #2e5a6a
+ *   accent:   #2a9d8f    golden:   #e9c46a    orange:   #f4a261
+ *   terra:    #e76f51    text:     #c4bfb9
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,300;0,400;0,500;1,400&display=swap');
+
+:root,
+body[data-jp-theme-name="JupyterLab Dark"] {
+  /* -- Layout backgrounds -- */
+  --jp-layout-color0: #222222;
+  --jp-layout-color1: #264653;
+  --jp-layout-color2: #2a3a42;
+  --jp-layout-color3: #2e5a6a;
+  --jp-layout-color4: #1a1a1a;
+
+  /* -- Brand / accent -- */
+  --jp-brand-color1: #2a9d8f;
+  --jp-brand-color2: #238075;
+  --jp-brand-color3: #1a6358;
+
+  /* -- Borders -- */
+  --jp-border-color0: #2e5a6a;
+  --jp-border-color1: #2e5a6a;
+  --jp-border-color2: #264653;
+  --jp-border-color3: #222222;
+  --jp-border-radius: 0px;
+
+  /* -- Content fonts -- */
+  --jp-content-font-family: 'EB Garamond', Palatino, "Book Antiqua", Georgia, serif;
+  --jp-content-font-size1: 1.0625rem;
+  --jp-content-line-height: 1.7;
+  --jp-content-font-color1: #c4bfb9;
+  --jp-content-font-color2: #f4a261;
+  --jp-content-font-color3: #e76f51;
+
+  /* -- Code fonts -- */
+  --jp-code-font-family: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --jp-code-font-size: 0.9rem;
+
+  /* -- UI fonts -- */
+  --jp-ui-font-family: 'EB Garamond', Palatino, "Book Antiqua", Georgia, serif;
+  --jp-ui-font-color1: #c4bfb9;
+  --jp-ui-font-color2: #f4a261;
+  --jp-ui-font-color3: #e76f51;
+
+  /* -- Cell -- */
+  --jp-cell-editor-background: #264653;
+  --jp-cell-editor-border-color: #2e5a6a;
+  --jp-cell-editor-active-background: #264653;
+  --jp-cell-prompt-font-family: 'Geist Mono', ui-monospace, monospace;
+  --jp-cell-prompt-not-active-font-color: #e76f51;
+
+  /* -- Notebook -- */
+  --jp-notebook-padding: 24px;
+
+  /* -- Toolbar -- */
+  --jp-toolbar-background: #222222;
+  --jp-toolbar-border-color: #2e5a6a;
+
+  /* -- Scrollbar -- */
+  --jp-scrollbar-thumb-color: #2e5a6a;
+
+  /* -- Active cell indicator -- */
+  --jp-cell-inprompt-font-color: #2a9d8f;
+  --jp-cell-outprompt-font-color: #e76f51;
+
+  /* -- Sidebar -- */
+  --jp-sidebar-min-width: 200px;
+
+  /* -- Editor -- */
+  --jp-editor-selected-background: #2e5a6a;
+  --jp-editor-selected-focused-background: #2e5a6a;
+  --jp-editor-cursor-color: #e9c46a;
+
+  /* -- Accent for warnings/info -- */
+  --jp-warn-color0: #e76f51;
+  --jp-warn-color1: #f4a261;
+  --jp-info-color0: #2a9d8f;
+
+  /* -- Search/input -- */
+  --jp-input-background: #264653;
+  --jp-input-border-color: #2e5a6a;
+  --jp-input-active-border-color: #2a9d8f;
+}
+
+/* -- Active cell left bar -- */
+.jp-Notebook .jp-Cell.jp-mod-active .jp-InputArea-prompt {
+  border-left: 3px solid #2a9d8f;
+}
+
+/* -- Markdown headings -- */
+.jp-RenderedHTMLCommon h1,
+.jp-RenderedHTMLCommon h2,
+.jp-RenderedHTMLCommon h3,
+.jp-RenderedHTMLCommon h4 {
+  color: #e9c46a;
+  font-family: 'EB Garamond', Palatino, "Book Antiqua", Georgia, serif;
+  font-weight: 400;
+}
+
+/* -- Markdown links -- */
+.jp-RenderedHTMLCommon a {
+  color: #2a9d8f;
+}
+
+/* -- Markdown code spans -- */
+.jp-RenderedHTMLCommon code {
+  background: #264653;
+  border: 1px solid #2e5a6a;
+  border-radius: 0;
+  color: #e76f51;
+}
+
+/* -- Remove border-radius everywhere -- */
+.jp-Toolbar,
+.jp-Cell,
+.jp-InputArea-editor,
+.jp-OutputArea-output,
+.jp-Dialog,
+.jp-DirListing-item,
+.jp-NotebookPanel-toolbar,
+button.jp-mod-styled {
+  border-radius: 0 !important;
+}
+
+/* -- Buttons -- */
+button.jp-mod-styled.jp-mod-accept {
+  background: #2a9d8f;
+  border: none;
+  border-radius: 0;
+  color: #fff;
+}
+
+button.jp-mod-styled.jp-mod-accept:hover {
+  opacity: 0.9;
+}
+
+/* -- Tab bar -- */
+.lm-TabBar-tab.lm-mod-current {
+  border-bottom: 2px solid #2a9d8f;
+}
+
+/* -- Bold text in markdown -- */
+.jp-RenderedHTMLCommon strong {
+  color: #f4a261;
+}
+
+/* -- Details/summary (used for Thought blocks) -- */
+.jp-RenderedHTMLCommon details summary {
+  color: #e76f51;
+  cursor: pointer;
+}
+
+.jp-RenderedHTMLCommon details {
+  border: 1px solid #2e5a6a;
+  padding: 0.5em 1em;
+  margin: 0.5em 0;
+  background: rgba(38, 70, 83, 0.5);
+}

@@ -13,6 +13,10 @@ source .venv/bin/activate
 pip install -q -r requirements.txt
 jupyter lite build --contents content --output-dir _output
 
+# Inject custom CSS into the built output
+mkdir -p _output/custom
+cp custom/custom.css _output/custom/custom.css
+
 # Copy landing page
 mkdir -p _output/landing
 cp landing/index.html _output/landing/index.html
