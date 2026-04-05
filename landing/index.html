@@ -202,6 +202,23 @@
     .enter-btn:hover { opacity: 0.9; }
     .enter-btn:active { transform: scale(0.95); }
 
+    /* -- Reset button -- */
+    .reset-btn {
+      display: inline-block;
+      background: transparent;
+      color: var(--color-gray-tertiary);
+      border: 1px solid var(--color-gray-tertiary);
+      padding: 0.75rem 1.75rem;
+      border-radius: 0;
+      font-family: var(--font-sans);
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .reset-btn:hover { background: var(--color-gray-tertiary); color: #fff; }
+    .reset-btn:active { transform: scale(0.95); }
+
     /* -- Note box -- */
     .note {
       margin-top: 3rem;
@@ -310,11 +327,57 @@
     </div>
 
     <div class="animate-in" style="animation-delay: 650ms;">
-      <a class="enter-btn" href="/">Open Notebook Environment</a>
+      <a class="enter-btn" id="enter-btn" href="/">Open Notebook Environment</a>
     </div>
 
     <div class="note animate-in" style="animation-delay: 800ms;">
       <strong>Trouble?</strong> Lecture notes and slides live at <a href="https://github.com/Quillstacks/LectureMaterial/tree/main/lecturenotes" style="color:var(--color-near-black);border-bottom:1px solid var(--color-border);">Quillstacks/LectureMaterial</a>. If notebooks won't load, try a hard refresh (<code>Ctrl+Shift+R</code>) or switch to Chrome.
+
+    </div>
+
+    <div class="animate-in" style="animation-delay: 850ms; margin-top: 1.5rem;">
+      <p style="font-size: 0.85rem; color: var(--color-gray-tertiary); margin-bottom: 0.5rem;">Notebooks outdated? Your browser caches notebooks locally. This resets them to the latest version. <strong style="color: var(--color-gray-tertiary);">Unsaved work will be lost.</strong></p>
+      <button onclick="resetNotebooks()" class="reset-btn" id="reset-btn">Reset cached notebooks</button>
+      <script>
+        // Match reset button width to the enter button
+        window.addEventListener('load', function() {
+          var w = document.getElementById('enter-btn').offsetWidth;
+          document.getElementById('reset-btn').style.width = w + 'px';
+        });
+
+        async function resetNotebooks() {
+          if (!confirm('This will delete all locally cached notebooks. Any unsaved work will be lost. Continue?')) return;
+
+          // 1. Unregister all service workers
+          if ('serviceWorker' in navigator) {
+            var regs = await navigator.serviceWorker.getRegistrations();
+            for (var r of regs) { await r.unregister(); }
+          }
+
+          // 2. Clear all Cache API caches
+          if ('caches' in window) {
+            var keys = await caches.keys();
+            for (var k of keys) { await caches.delete(k); }
+          }
+
+          // 3. Clear all IndexedDB databases
+          if (indexedDB.databases) {
+            var dbs = await indexedDB.databases();
+            dbs.forEach(function(db) { indexedDB.deleteDatabase(db.name); });
+          } else {
+            ['JupyterLite Storage', 'jupyter-lite-storage', 'localforage'].forEach(function(name) {
+              indexedDB.deleteDatabase(name);
+            });
+          }
+
+          // 4. Clear localStorage and sessionStorage
+          localStorage.clear();
+          sessionStorage.clear();
+
+          alert('All caches cleared. The page will reload.');
+          location.href = '/';
+        }
+      </script>
     </div>
 
     <footer class="animate-in" style="animation-delay: 950ms;">
