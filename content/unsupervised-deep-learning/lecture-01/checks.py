@@ -289,8 +289,16 @@ def check_minmax(result, data):
 # ---------------------------------------------------------------------------
 
 def check_distance_comparison(fn_euclid, fn_manhattan, fn_cosine, fn_mahal,
-                              x_raw, y_raw, cov_raw, x_z, y_z, cov_z):
+                              x_raw, y_raw, cov_raw, features_z, idx_x=0, idx_y=11):
     """Validate and print a side-by-side table of raw vs z-scored distances."""
+
+    if features_z is None:
+        print(f"  {_NONE} Implement zscore_normalize() first to compare distances.")
+        return
+
+    x_z = features_z[idx_x]
+    y_z = features_z[idx_y]
+    cov_z = np.cov(features_z, rowvar=False)
 
     metrics = [
         ("Euclidean",   lambda xv, yv, _: fn_euclid(xv, yv)),
@@ -322,3 +330,21 @@ def check_distance_comparison(fn_euclid, fn_manhattan, fn_cosine, fn_mahal,
     if all_ok:
         print()
         print(f"  {_OK} All distances computed.")
+
+
+# ---------------------------------------------------------------------------
+# Pairwise distance matrix (safe builder)
+# ---------------------------------------------------------------------------
+
+def pairwise_distances(fn, features):
+    """Build an n x n distance matrix using fn. Returns None if fn is not implemented."""
+    test = fn(features[0], features[1])
+    if test is None:
+        print(f"  {_NONE} Implement the distance function first.")
+        return None
+    n = len(features)
+    D = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            D[i, j] = fn(features[i], features[j])
+    return D
