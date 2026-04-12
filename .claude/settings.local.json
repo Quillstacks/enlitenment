@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(mv content/unsupervised-deep-learning/lecture-01/01_foundations_checks.py content/unsupervised-deep-learning/lecture-01/checks.py)",
+      "Bash(mkdir -p solutions/unsupervised-deep-learning/lecture-01)",
+      "Bash(mv content/unsupervised-deep-learning/lecture-01/01_foundations_solutions.ipynb solutions/unsupervised-deep-learning/lecture-01/01_foundations_solutions.ipynb)",
+      "Bash(mv content/unsupervised-deep-learning/lecture-01/notebookskill.md notebookskill.md)",
+      "Bash(rm -f content/unsupervised-deep-learning/.gitkeep solutions/unsupervised-deep-learning/.gitkeep)",
+      "Bash(python -c \"import jupyterlite_core; print\\(jupyterlite_core.__version__\\)\")",
+      "Bash(mv solutions/unsupervised-deep-learning/lecture-01/01_foundations_solutions.ipynb content/unsupervised-deep-learning/lecture-01/01_foundations_solutions.ipynb)",
+      "Bash(rm -rf solutions/)",
+      "Bash(find . -type d -name __pycache__ -exec rm -rf {} +)",
+      "Bash(rm -f README.md)",
+      "Bash(mv 01_TappingIntoComputationalPower lecture-01)",
+      "Bash(mv 02_GettingUsedToErrorsEverywhere lecture-02)",
+      "Bash(mv 03_WeCallItCharacter lecture-03)",
+      "Bash(mv 01_TappingIntoComputationalPower/gridsearch.py .)",
+      "Bash(rmdir 01_TappingIntoComputationalPower)",
+      "Skill(academic-writing-agents:academic)"
+    ]
+  }
+}
