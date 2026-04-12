@@ -12,9 +12,31 @@ _ORANGE   = '#f4a261'
 _TERRA    = '#e76f51'
 _TEXT     = '#c4bfb9'
 
+# --- Extended palette (10-variety coffee datasets) ---
+_SAGE     = '#a8d8a8'
+_STEEL    = '#6c9ebf'
+_LAVENDER = '#c7b8ea'
+_CORAL    = '#f4978e'
+_PEACH    = '#f7c59f'
+
+# --- Variety → colour mapping (shared by UDL notebooks) ---
+_variety_colors = {
+    'espresso'    : _TERRA,
+    'ristretto'   : _ORANGE,
+    'lungo'       : _GOLDEN,
+    'americano'   : _ACCENT,
+    'cappuccino'  : _TEXT,
+    'latte'       : _SAGE,
+    'flat_white'  : _STEEL,
+    'cold_brew'   : _LAVENDER,
+    'pour_over'   : _CORAL,
+    'french_press': _PEACH,
+}
+
 __all__ = [
     '_BG', '_SURFACE', '_BORDER', '_ACCENT', '_GOLDEN', '_ORANGE', '_TERRA', '_TEXT',
-    'tufte_axis',
+    '_SAGE', '_STEEL', '_LAVENDER', '_CORAL', '_PEACH',
+    '_variety_colors', 'tufte_axis',
 ]
 
 plt.rcParams.update({
