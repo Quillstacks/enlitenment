@@ -191,60 +191,59 @@ def check_monte_carlo(fn, f, a, b, n_samples):
 
 
 # ---------------------------------------------------------------------------
-# Estimate Pi
+# Hit-or-Miss Monte Carlo
 # ---------------------------------------------------------------------------
 
-def check_pi(fn, n_samples):
+def check_hit_or_miss(fn, f, a, b, f_max, n_samples):
     # Seed before student call
     np.random.seed(42)
-    got = fn(n_samples)
+    got = fn(f, a, b, f_max, n_samples)
 
     # Seed before reference call
     np.random.seed(42)
-    x = np.random.uniform(0, 1, n_samples)
-    y = np.random.uniform(0, 1, n_samples)
-    inside = np.sum(x**2 + y**2 <= 1)
-    expected = 4 * inside / n_samples
+    x = np.random.uniform(a, b, n_samples)
+    y = np.random.uniform(0, f_max, n_samples)
+    hits = np.sum(y <= f(x))
+    expected = (b - a) * f_max * hits / n_samples
 
-    tol = 0.1  # relaxed tolerance for stochastic methods
+    tol = 0.15  # relaxed tolerance for stochastic methods
 
     if got is None:
-        print(f"  {_NONE} Pi estimate: not implemented yet (expected ~{expected:.4f})")
+        print(f"  {_NONE} Hit-or-miss: not implemented yet (expected ~{expected:.4f})")
         return
 
     if _close(got, expected, tol=tol):
-        print(f"  {_OK} Pi estimate({n_samples}) = {got:.4f}")
+        print(f"  {_OK} Hit-or-miss({n_samples}) = {got:.4f}")
         return
 
-    # Mistake: forgot to multiply by 4
+    # Mistake: forgot to scale by box area
     np.random.seed(42)
-    x2 = np.random.uniform(0, 1, n_samples)
-    y2 = np.random.uniform(0, 1, n_samples)
-    inside2 = np.sum(x2**2 + y2**2 <= 1)
-    no_four = inside2 / n_samples
-    if _close(got, no_four, tol=tol):
-        print(f"  {_FAIL} Pi estimate = {got:.4f}  (expected ~{expected:.4f})")
-        print(f"       Hint: you computed the fraction inside the quarter circle,")
-        print(f"       but forgot to multiply by 4. The full circle has area pi*r^2,")
-        print(f"       and the quarter circle is pi/4 of the unit square.")
+    x2 = np.random.uniform(a, b, n_samples)
+    y2 = np.random.uniform(0, f_max, n_samples)
+    hits2 = np.sum(y2 <= f(x2))
+    no_scale = hits2 / n_samples
+    if _close(got, no_scale, tol=tol):
+        print(f"  {_FAIL} Hit-or-miss = {got:.4f}  (expected ~{expected:.4f})")
+        print(f"       Hint: you computed the fraction of hits, but forgot to")
+        print(f"       multiply by the box area (b - a) * f_max.")
         return
 
-    # Mistake: used wrong quadrant (full circle instead of quarter)
+    # Mistake: only scaled by (b - a), forgot f_max
     np.random.seed(42)
-    x3 = np.random.uniform(-1, 1, n_samples)
-    y3 = np.random.uniform(-1, 1, n_samples)
-    inside3 = np.sum(x3**2 + y3**2 <= 1)
-    wrong_quadrant = 4 * inside3 / n_samples
-    if _close(got, wrong_quadrant, tol=tol):
-        print(f"  {_FAIL} Pi estimate = {got:.4f}  (expected ~{expected:.4f})")
-        print(f"       Hint: sample from [0, 1] x [0, 1] (the quarter circle),")
-        print(f"       not from [-1, 1] x [-1, 1]. The ratio inside the quarter")
-        print(f"       circle is pi/4, so multiply by 4.")
+    x3 = np.random.uniform(a, b, n_samples)
+    y3 = np.random.uniform(0, f_max, n_samples)
+    hits3 = np.sum(y3 <= f(x3))
+    no_fmax = (b - a) * hits3 / n_samples
+    if _close(got, no_fmax, tol=tol):
+        print(f"  {_FAIL} Hit-or-miss = {got:.4f}  (expected ~{expected:.4f})")
+        print(f"       Hint: the bounding box has height f_max, not 1.")
+        print(f"       Multiply by (b - a) * f_max, not just (b - a).")
         return
 
-    print(f"  {_FAIL} Pi estimate = {got:.4f}  (expected ~{expected:.4f})")
-    print(f"       Hint: sample (x, y) in [0, 1]^2, count how many satisfy")
-    print(f"       x^2 + y^2 <= 1, then return 4 * count / n_samples.")
+    print(f"  {_FAIL} Hit-or-miss = {got:.4f}  (expected ~{expected:.4f})")
+    print(f"       Hint: sample x in [{a}, {b}] and y in [0, f_max],")
+    print(f"       count how many satisfy y <= f(x),")
+    print(f"       then return (b - a) * f_max * count / n_samples.")
 
 
 # ---------------------------------------------------------------------------

@@ -31,7 +31,7 @@ def _find_global(f, bounds, n_grid=100000):
 # Random Restart
 # ---------------------------------------------------------------------------
 
-def check_random_restart(fn, newton_fn, f, f_prime, f_double_prime,
+def check_random_restart(fn, optimizer_fn, f, f_prime,
                          n_restarts, bounds, known_global_x, known_global_f):
     """
     Validate the student's random_restart implementation.
@@ -39,12 +39,12 @@ def check_random_restart(fn, newton_fn, f, f_prime, f_double_prime,
     Parameters
     ----------
     fn : callable
-        Student's random_restart(newton_fn, f, f_prime, f_double_prime,
+        Student's random_restart(optimizer_fn, f, f_prime,
                                  n_restarts, bounds) -> (best_x, best_f, all_results)
-    newton_fn : callable
-        The newton_optimize reference provided in the notebook.
-    f, f_prime, f_double_prime : callables
-        Shekel landscape and its derivatives.
+    optimizer_fn : callable
+        The local_optimize reference provided in the notebook.
+    f, f_prime : callables
+        Shekel landscape and its derivative.
     n_restarts : int
     bounds : tuple
     known_global_x : float
@@ -53,7 +53,7 @@ def check_random_restart(fn, newton_fn, f, f_prime, f_double_prime,
         Approximate function value at the global minimum.
     """
     np.random.seed(42)
-    got = fn(newton_fn, f, f_prime, f_double_prime, n_restarts, bounds)
+    got = fn(optimizer_fn, f, f_prime, n_restarts, bounds)
 
     # --- not implemented ---
     if got is None:
@@ -89,7 +89,7 @@ def check_random_restart(fn, newton_fn, f, f_prime, f_double_prime,
     exp_best_f = float('inf')
     for _ in range(n_restarts):
         x0 = np.random.uniform(bounds[0], bounds[1])
-        x_star, history, n_evals = newton_fn(f, f_prime, f_double_prime, x0)
+        x_star, history, n_evals = optimizer_fn(f, f_prime, x0)
         f_star = f(x_star)
         exp_results.append({'x0': x0, 'x_final': x_star, 'f_final': f_star})
         if f_star < exp_best_f:
@@ -147,7 +147,7 @@ def check_random_restart(fn, newton_fn, f, f_prime, f_double_prime,
 # Basin Hopping
 # ---------------------------------------------------------------------------
 
-def check_basin_hopping(fn, newton_fn, f, f_prime, f_double_prime,
+def check_basin_hopping(fn, optimizer_fn, f, f_prime,
                         x0, n_jumps, jump_range, bounds,
                         known_global_x, known_global_f):
     """
@@ -156,12 +156,12 @@ def check_basin_hopping(fn, newton_fn, f, f_prime, f_double_prime,
     Parameters
     ----------
     fn : callable
-        Student's basin_hopping(newton_fn, f, f_prime, f_double_prime,
+        Student's basin_hopping(optimizer_fn, f, f_prime,
                                 x0, n_jumps, jump_range, bounds)
               -> (best_x, best_f, jump_history)
-    newton_fn : callable
-        The newton_optimize reference provided in the notebook.
-    f, f_prime, f_double_prime : callables
+    optimizer_fn : callable
+        The local_optimize reference provided in the notebook.
+    f, f_prime : callables
     x0 : float
     n_jumps : int
     jump_range : float
@@ -169,7 +169,7 @@ def check_basin_hopping(fn, newton_fn, f, f_prime, f_double_prime,
     known_global_x, known_global_f : float
     """
     np.random.seed(42)
-    got = fn(newton_fn, f, f_prime, f_double_prime, x0, n_jumps, jump_range, bounds)
+    got = fn(optimizer_fn, f, f_prime, x0, n_jumps, jump_range, bounds)
 
     # --- not implemented ---
     if got is None:
@@ -201,7 +201,7 @@ def check_basin_hopping(fn, newton_fn, f, f_prime, f_double_prime,
 
     current_x = x0
     for jump_num in range(n_jumps):
-        x_local, hist, n_evals = newton_fn(f, f_prime, f_double_prime, current_x)
+        x_local, hist, n_evals = optimizer_fn(f, f_prime, current_x)
         f_local = f(x_local)
         if f_local < exp_best_f:
             exp_best_f = f_local
