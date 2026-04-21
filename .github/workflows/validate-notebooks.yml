@@ -1,0 +1,74 @@
+name: Validate notebooks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  execute:
+    name: Execute student notebooks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-notebooks.txt
+
+      - name: Execute every student notebook
+        run: |
+          set -e
+          shopt -s globstar nullglob
+          fail=0
+          for nb in content/**/lecture-*/*.ipynb; do
+            case "$nb" in
+              *_solutions.ipynb) continue ;;
+            esac
+            echo "::group::$nb"
+            if ! jupyter nbconvert --to notebook --execute "$nb" \
+                 --output /tmp/_exec.ipynb --ExecutePreprocessor.timeout=300; then
+              fail=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $fail
+
+  build:
+    name: JupyterLite build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build site
+        run: |
+          jupyter lite build --contents content --output-dir _output/notebooks
+          cp landing/index.html _output/index.html
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: _output
+          retention-days: 7

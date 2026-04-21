@@ -1,0 +1,11 @@
+# Runtime dependencies for executing the lecture notebooks.
+# Kept separate from requirements.txt (which holds the JupyterLite build tools).
+# Used by the CI validation job and anyone opening the notebooks in a local kernel.
+
+numpy
+matplotlib
+pandas
+scipy
+scikit-learn
+jupyter
+nbconvert
