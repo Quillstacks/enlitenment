@@ -1,0 +1,19 @@
+# Offline-only dependencies for generating precomputed assets that ship with
+# notebooks (e.g. trained AE/VAE embeddings for lecture-06, UMAP embeddings
+# for lecture-05). Not installed by the build pipeline and not required for
+# running the deployed notebooks.
+#
+# Install with:
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements-precompute.txt
+#
+# Then run the per-lecture generator, e.g.
+#   python content/unsupervised-deep-learning/lecture-06/generate_precomputed.py
+
+torch
+numpy
+pandas
+matplotlib
+scikit-learn
+umap-learn
