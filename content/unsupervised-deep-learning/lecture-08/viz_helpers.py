@@ -94,6 +94,12 @@ def train_clip_attribute_encoder(contrastive_loss_fn, attrs_source,
     rng = np.random.default_rng(seed)
     A_train = np.array([attrs_source[int(y)] for y in y_src], dtype=np.float64)
 
+    if emb_src is None:
+        print('⬜ Implement encode above first so the bridge has image embeddings to align to.')
+        n_attrs, d_emb = len(attr_names), 16
+        w0 = rng.normal(size=n_attrs * d_emb) * 0.1
+        return None, w0, np.array([], dtype=int)
+
     n_total = len(emb_src)
     n_pairs = min(n_pairs, n_total)
     idx_pairs = rng.choice(n_total, size=n_pairs, replace=False)

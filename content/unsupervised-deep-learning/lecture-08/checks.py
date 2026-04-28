@@ -83,6 +83,10 @@ def check_encode(fn, X, mlp):
 
 def check_linear_probe(fn, emb_train, y_train, emb_test, y_test):
     from sklearn.linear_model import LogisticRegression
+    if emb_train is None or emb_test is None:
+        print(f"  {_NONE} linear_probe: implement encode first so the probe has embeddings to fit on")
+        return
+
     got = fn(emb_train, y_train, emb_test, y_test)
 
     expected = float(LogisticRegression(max_iter=2000)
@@ -184,6 +188,10 @@ def check_attribute_table(attrs_target, attr_names):
 # ---------------------------------------------------------------------------
 
 def check_class_centroids(fn, emb, labels):
+    if emb is None:
+        print(f"  {_NONE} class_centroids: implement encode first so centroids have embeddings to average")
+        return
+
     got = fn(emb, labels)
 
     if got is None:
