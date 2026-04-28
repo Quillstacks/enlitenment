@@ -12,6 +12,8 @@
 #   python content/unsupervised-deep-learning/lecture-06/generate_precomputed.py
 
 torch
+torchvision
+scipy
 numpy
 pandas
 matplotlib

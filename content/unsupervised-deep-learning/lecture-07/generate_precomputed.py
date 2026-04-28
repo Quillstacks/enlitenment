@@ -6,13 +6,11 @@ needs and writes the CSVs that the student notebook visualizes.
 The recipe:
 - Train set : ~5000 MNIST samples drawn from digits {0, 2, 4, 6, 8}.
 - Test set  : ~1000 evens (held-out, in-distribution) + ~1000 odds (out-of-
-  distribution by construction — the model never sees these labels).
-- Models    : three small MLP classifiers with three different dropout rates
-              (for the MC-dropout sweep), a VAE on evens (for reconstruction-
-              based anomaly detection), a 6-class classifier with a `misc`
-              output trained against scrambled inputs (for the misc-class
-              section), and one classifier with a confidence head (for the
-              optional take-it-from-here).
+  distribution by construction, the model never sees these labels).
+- Models    : a small MLP classifier with dropout p=0.3 (used for both the
+              calibration trap and the MC-dropout passes), a VAE on evens
+              (for reconstruction-based anomaly detection), and one classifier
+              with a confidence head (for the confidence-head section).
 - Outputs   : CSVs alongside this script, one per visualization.
 
 Usage (from repo root):
@@ -25,14 +23,10 @@ Outputs (alongside this script):
     mnist_evens_odds.npz       - cached train/test arrays (regenerate by deleting)
     test_images.csv            - test-set pixels (idx, label, parity, pixel_0..783)
     clf_predictions.csv        - main classifier softmax + logits on test set
-    mc_dropout_p01.csv         - T=20 MC-dropout passes, dropout 0.1
     mc_dropout_p03.csv         - T=20 MC-dropout passes, dropout 0.3
-    mc_dropout_p05.csv         - T=20 MC-dropout passes, dropout 0.5
-    tta_passes.csv             - 8 augmentation passes through the main model
     vae_recon_errors.csv       - per-sample VAE reconstruction error
     vae_recon_examples.csv     - 50 evens + 50 odds (orig, recon) pairs for a grid
     vae_latent_codes.csv       - VAE latent means (k=16) for the test set
-    misc_clf_softmax.csv       - 6-class softmax including misc class
     confidence_head_preds.csv  - main classifier prediction + scalar confidence
 """
 
@@ -43,7 +37,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy.ndimage import rotate, shift
 
 HERE = Path(__file__).resolve().parent
 SEED = 0
@@ -57,7 +50,6 @@ N_TEST_PER_CLASS  = 200    # 1000 evens + 1000 odds for testing
 
 LATENT_K          = 16
 T_MC_DROPOUT      = 20
-N_TTA_PASSES      = 8
 
 
 # ---------------------------------------------------------------------------
@@ -162,9 +154,17 @@ class VAE(nn.Module):
 
 
 class ConfidenceClassifier(nn.Module):
-    """Classifier with an extra scalar confidence head, DeVries & Taylor 2018."""
+    """Classifier with an extra scalar confidence head, DeVries & Taylor 2018.
 
-    def __init__(self, n_out=5, p_drop=0.3):
+    Light dropout (p=0.1) on the trunk: heavier dropout shifts the cnf logit
+    between train and eval and saturates `c`, while no regularization at all
+    lets the cls head fit MNIST evens to ~0 training loss, which gives the
+    confidence head no incentive to drop `c` on hard inputs. p=0.1 plus
+    weight decay (in the optimizer) and Gaussian input noise during training
+    is enough to keep NLL nontrivial without breaking `c` calibration.
+    """
+
+    def __init__(self, n_out=5, p_drop=0.2):
         super().__init__()
         self.fc1 = nn.Linear(784, 256)
         self.fc2 = nn.Linear(256, 128)
@@ -209,7 +209,11 @@ def train_classifier(model, X, y_idx, epochs=25, batch=128, lr=1e-3, tag=""):
     return model
 
 
-def train_vae(model, X, epochs=60, batch=128, lr=1e-3, beta=1.0):
+def train_vae(model, X, epochs=120, batch=128, lr=1e-3, beta=1.0):
+    """Train a VAE with BCE reconstruction. Sigmoid decoder + [0,1] pixels match
+    a Bernoulli observation model, so BCE is the correct likelihood (MSE on the
+    same head produces blurry reconstructions and a flatter in-dist / OOD gap).
+    """
     torch.manual_seed(SEED)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     Xt = torch.from_numpy(X)
@@ -221,29 +225,73 @@ def train_vae(model, X, epochs=60, batch=128, lr=1e-3, beta=1.0):
             xb = Xt[sl]
             opt.zero_grad()
             mu, logvar, _, x_hat = model(xb)
-            recon = F.mse_loss(x_hat, xb, reduction="sum") / len(xb)
+            recon = F.binary_cross_entropy(x_hat, xb, reduction="sum") / len(xb)
             kl = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).sum(dim=1).mean()
             loss = recon + beta * kl
             loss.backward(); opt.step()
             total_recon += float(recon) * len(xb)
             total_kl    += float(kl)    * len(xb)
-        if (ep + 1) % 10 == 0 or ep == 0:
+        if (ep + 1) % 20 == 0 or ep == 0:
             print(f"  [vae] epoch {ep+1:3d}/{epochs}  "
                   f"recon={total_recon/len(X):.3f}  kl={total_kl/len(X):.3f}")
     model.eval()
     return model
 
 
-def train_confidence_classifier(model, X, y_idx, epochs=25, batch=128, lr=1e-3,
-                                lam=0.1, budget=0.3, tag="confhead"):
-    """DeVries & Taylor 2018 'learning confidence for OOD'.
+def make_synthetic_ood_batch(X_pool, n, rng):
+    """n synthetic OOD inputs: thirds-mix of pixel-shuffled evens, mixup of two
+    evens, and heavily rotated evens (60-300 deg).
 
-    Loss = NLL on a hint-blended prediction p' = c * p + (1-c) * y_onehot,
-    plus a -log(c) penalty weighted by lam. The model can lower its loss by
-    asking for hints (low c) on hard inputs, but pays a confidence penalty.
+    The rotated set is the most useful proxy: it preserves digit-like shape but
+    breaks the trained orientation, which is the closest 'digit but not from
+    training' signal we can synthesise without OOD labels.
+    """
+    from scipy.ndimage import rotate
+    X_pool = np.asarray(X_pool, dtype=np.float32)
+    n_each = n // 3
+    n_rot  = n - 2 * n_each
+
+    base = X_pool[rng.integers(0, len(X_pool), size=n_each)].copy()
+    for i in range(n_each):
+        rng.shuffle(base[i])
+
+    a = X_pool[rng.integers(0, len(X_pool), size=n_each)]
+    b = X_pool[rng.integers(0, len(X_pool), size=n_each)]
+    alpha = rng.uniform(0.3, 0.7, size=(n_each, 1)).astype(np.float32)
+    mixed = alpha * a + (1 - alpha) * b
+
+    src = X_pool[rng.integers(0, len(X_pool), size=n_rot)].reshape(-1, 28, 28)
+    angles = rng.uniform(60, 300, size=n_rot)
+    rotated = np.stack([
+        rotate(im, ang, reshape=False, order=1, mode='constant')
+        for im, ang in zip(src, angles)
+    ]).reshape(-1, 784).astype(np.float32).clip(0.0, 1.0)
+
+    return np.concatenate([base, mixed, rotated], axis=0).astype(np.float32)
+
+
+def train_confidence_classifier(model, X, y_idx, epochs=80, batch=128, lr=1e-3,
+                                lam=0.2, budget=0.5, weight_decay=1e-3,
+                                lam_floor=0.15, alpha_ood=0.5,
+                                tag="confhead"):
+    """DeVries & Taylor 2018 confidence head + outlier exposure.
+
+    Loss per batch:
+        NLL on hint-blended p' = c * p + (1-c) * y_onehot     # in-distribution
+      + lam * mean(-log(c))                                    # confidence penalty
+      + alpha_ood * mean(-log(1 - c_ood))                      # push c -> 0 on synth OOD
+
+    Without the OOD term the head learns to be confident on everything trained-
+    distribution looks like, including odd digits the model never saw - the gap
+    between in-dist and OOD c stays small. The synthetic OOD batch gives the
+    head a real `this is not a clean training digit` gradient signal that
+    partially generalises to true OOD.
+
+    No dropout and no input noise: each was tried but introduced a train/eval
+    distribution shift on the cnf head that collapsed c to 0 at eval time.
     """
     torch.manual_seed(SEED)
-    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     Xt = torch.from_numpy(X)
     yt = torch.from_numpy(y_idx).long()
     n_cls = int(y_idx.max() + 1)
@@ -252,27 +300,36 @@ def train_confidence_classifier(model, X, y_idx, epochs=25, batch=128, lr=1e-3,
     lam_now = float(lam)
     for ep in range(epochs):
         total = 0.0
+        last_conf_pen = last_mean_c_id = last_mean_c_ood = 0.0
         for sl in _batches(len(X), batch, rng):
             opt.zero_grad()
-            logits, c = model(Xt[sl])
+            xb = Xt[sl]
+            logits, c_id = model(xb)
             p = F.softmax(logits, dim=1)
             yh = F.one_hot(yt[sl], n_cls).float()
-            c_ = c.unsqueeze(1).clamp(1e-6, 1 - 1e-6)
+            c_ = c_id.unsqueeze(1).clamp(1e-6, 1 - 1e-6)
             p_blend = c_ * p + (1 - c_) * yh
             nll = -torch.log((p_blend * yh).sum(dim=1) + 1e-12).mean()
-            conf_pen = -torch.log(c.clamp(1e-6, 1.0)).mean()
-            loss = nll + lam_now * conf_pen
+            conf_pen = -torch.log(c_id.clamp(1e-6, 1.0)).mean()
+
+            ood_np = make_synthetic_ood_batch(X, n=len(sl), rng=rng)
+            _, c_ood = model(torch.from_numpy(ood_np))
+            ood_loss = -torch.log((1.0 - c_ood).clamp(1e-6, 1.0)).mean()
+
+            loss = nll + lam_now * conf_pen + alpha_ood * ood_loss
             loss.backward(); opt.step()
             total += float(loss) * len(sl)
-        # Adapt lam to keep mean confidence near `budget`.
-        with torch.no_grad():
-            _, c_all = model(Xt[:1024])
-            mean_c = float(c_all.mean())
-        if mean_c > budget: lam_now *= 1.01
-        else:               lam_now /= 1.01
+            cp = float(conf_pen)
+            if cp < budget: lam_now /= 1.01
+            else:           lam_now *= 1.01
+            lam_now = max(lam_floor, lam_now)
+            last_conf_pen   = cp
+            last_mean_c_id  = float(c_id.mean())
+            last_mean_c_ood = float(c_ood.mean())
         if (ep + 1) % 5 == 0 or ep == 0:
             print(f"  [{tag}] epoch {ep+1:3d}/{epochs}  "
-                  f"loss={total/len(X):.4f}  mean_c={mean_c:.3f}  lam={lam_now:.3f}")
+                  f"loss={total/len(X):.4f}  mean_c_id={last_mean_c_id:.3f}  "
+                  f"mean_c_ood={last_mean_c_ood:.3f}  lam={lam_now:.3f}")
     model.eval()
     return model
 
@@ -323,38 +380,19 @@ def write_mc_dropout_passes(model, X_test, y_test, T, out_path):
     print(f"  wrote {out_path.name}  ({len(X_test)} rows, T={T})")
 
 
-def write_tta_passes(model, X_test, y_test, n_aug, out_path):
-    """Augmentation-time variance: small rotations and shifts, dropout off."""
-    parity = np.where(np.isin(y_test, EVEN_LABELS), "even", "odd")
-    cols = {"idx": np.arange(len(X_test)), "label": y_test, "parity": parity}
-    rng = np.random.default_rng(SEED + 7)
-    images = X_test.reshape(-1, 28, 28)
-    model.eval()
-    with torch.no_grad():
-        for a in range(n_aug):
-            ang = float(rng.uniform(-15, 15))
-            dx, dy = float(rng.uniform(-2, 2)), float(rng.uniform(-2, 2))
-            aug = np.stack([
-                shift(rotate(im, ang, reshape=False, order=1, mode="constant"),
-                      shift=(dy, dx), order=1, mode="constant")
-                for im in images
-            ]).reshape(-1, 784).astype(np.float32)
-            logits = model(torch.from_numpy(aug)).numpy()
-            p = np.exp(logits - logits.max(axis=1, keepdims=True))
-            p = p / p.sum(axis=1, keepdims=True)
-            for i, e in enumerate(EVEN_LABELS):
-                cols[f"a{a:02d}_c{e}"] = p[:, i]
-    pd.DataFrame(cols).to_csv(out_path, index=False)
-    print(f"  wrote {out_path.name}  ({len(X_test)} rows, n_aug={n_aug})")
-
-
 def write_vae_outputs(vae, X_test, y_test, errors_path, examples_path, latent_path):
-    """Reconstruction errors, a sample of (orig, recon) pairs, and latent codes."""
+    """Reconstruction errors, a sample of (orig, recon) pairs, and latent codes.
+
+    Decode from `mu` directly at eval. Going through `reparameterize` would
+    add stochastic noise to every reconstruction and dilute the in-dist / OOD
+    contrast we want to read off recon error.
+    """
     Xt = torch.from_numpy(X_test)
     with torch.no_grad():
-        mu, _, _, x_hat = vae(Xt)
-    mu      = mu.numpy()
-    x_hat   = x_hat.numpy()
+        mu_t, _ = vae.encode(Xt)
+        x_hat_t = vae.dec(mu_t)
+    mu      = mu_t.numpy()
+    x_hat   = x_hat_t.numpy()
     recon_e = ((X_test - x_hat) ** 2).mean(axis=1)
     parity  = np.where(np.isin(y_test, EVEN_LABELS), "even", "odd")
 
@@ -383,24 +421,19 @@ def write_vae_outputs(vae, X_test, y_test, errors_path, examples_path, latent_pa
     print(f"  wrote {latent_path.name}  ({len(X_test)} rows, k={LATENT_K})")
 
 
-def write_misc_predictions(model, X_test, y_test, out_path):
-    with torch.no_grad():
-        logits = model(torch.from_numpy(X_test)).numpy()
-    probs = np.exp(logits - logits.max(axis=1, keepdims=True))
-    probs = probs / probs.sum(axis=1, keepdims=True)
-    parity = np.where(np.isin(y_test, EVEN_LABELS), "even", "odd")
-    cols = {"idx": np.arange(len(X_test)), "label": y_test, "parity": parity}
-    for i, e in enumerate(EVEN_LABELS): cols[f"prob_{e}"] = probs[:, i]
-    cols["prob_misc"] = probs[:, 5]
-    cols["top1_class_idx"] = probs.argmax(axis=1)
-    pd.DataFrame(cols).to_csv(out_path, index=False)
-    print(f"  wrote {out_path.name}  ({len(X_test)} rows)")
-
-
 def write_confidence_head_preds(model, X_test, y_test, out_path):
+    """Single deterministic eval pass.
+
+    With outlier exposure during training the head no longer saturates at
+    `c = 1` on a single eval-mode pass, so we do not need MC-Dropout averaging
+    to desaturate. Eval-time MC averaging here actually hurts: it reintroduces
+    a train/eval distribution shift on the cnf head and collapses `c`.
+    """
+    model.eval()
+    Xt = torch.from_numpy(X_test)
     with torch.no_grad():
-        logits, c = model(torch.from_numpy(X_test))
-    logits, c = logits.numpy(), c.numpy()
+        logits, c = model(Xt)
+    logits = logits.numpy(); c = c.numpy()
     probs = np.exp(logits - logits.max(axis=1, keepdims=True))
     probs = probs / probs.sum(axis=1, keepdims=True)
     parity = np.where(np.isin(y_test, EVEN_LABELS), "even", "odd")
@@ -418,25 +451,6 @@ def write_confidence_head_preds(model, X_test, y_test, out_path):
 
 
 # ---------------------------------------------------------------------------
-# Misc-class supervisor inputs
-# ---------------------------------------------------------------------------
-
-def make_misc_inputs(X_train, n, rng):
-    """Build n inputs that should map to the misc class.
-
-    Half are pure Gaussian noise (clipped to [0,1]); half are pixel-shuffled
-    versions of real evens (preserves marginals, breaks structure).
-    """
-    n_noise   = n // 2
-    n_shuffle = n - n_noise
-    noise = rng.normal(0.5, 0.3, size=(n_noise, 784)).clip(0.0, 1.0).astype(np.float32)
-    base  = X_train[rng.integers(0, len(X_train), size=n_shuffle)].copy()
-    for i in range(n_shuffle):
-        rng.shuffle(base[i])
-    return np.concatenate([noise, base], axis=0)
-
-
-# ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 
@@ -450,7 +464,7 @@ def main():
     y_train_idx = even_label_to_index(y_train)
     print(f"Train evens : {X_train.shape}    Test (mixed): {X_test.shape}")
 
-    # 0. Test-set pixels — every visualization that wants to show an example
+    # 0. Test-set pixels: every visualization that wants to show an example
     # image merges on `idx` against this file.
     parity = np.where(np.isin(y_test, EVEN_LABELS), "even", "odd")
     img_cols = {"idx": np.arange(len(X_test)), "label": y_test, "parity": parity}
@@ -459,23 +473,16 @@ def main():
     pd.DataFrame(img_cols).to_csv(HERE / "test_images.csv", index=False)
     print(f"  wrote test_images.csv  ({len(X_test)} rows)")
 
-    # 1. MC-dropout sweep — three classifiers, three rates.
-    main_clf = None
-    for p in (0.1, 0.3, 0.5):
-        print(f"\n-- training classifier with dropout p={p} --")
-        clf = Classifier(n_out=5, p_drop=p)
-        train_classifier(clf, X_train, y_train_idx, tag=f"clf-p{int(p*10):02d}")
-        write_mc_dropout_passes(clf, X_test, y_test, T_MC_DROPOUT,
-                                HERE / f"mc_dropout_p{int(p*10):02d}.csv")
-        if abs(p - 0.3) < 1e-9:
-            main_clf = clf
-
-    # 2. Main classifier — used for confidence trap, TTA, energy/softmax.
-    print("\n-- main classifier outputs --")
+    # 1. Main classifier (dropout p=0.3): used for the calibration trap and
+    # the MC-dropout passes.
+    print("\n-- training main classifier (dropout p=0.3) --")
+    main_clf = Classifier(n_out=5, p_drop=0.3)
+    train_classifier(main_clf, X_train, y_train_idx, tag="clf-p03")
     write_main_predictions(main_clf, X_test, y_test, HERE / "clf_predictions.csv")
-    write_tta_passes(main_clf, X_test, y_test, N_TTA_PASSES, HERE / "tta_passes.csv")
+    write_mc_dropout_passes(main_clf, X_test, y_test, T_MC_DROPOUT,
+                            HERE / "mc_dropout_p03.csv")
 
-    # 3. VAE on evens.
+    # 2. VAE on evens.
     print("\n-- training VAE on evens --")
     vae = VAE(k=LATENT_K)
     train_vae(vae, X_train)
@@ -484,21 +491,10 @@ def main():
                       examples_path=HERE / "vae_recon_examples.csv",
                       latent_path  =HERE / "vae_latent_codes.csv")
 
-    # 4. Misc-class classifier.
-    print("\n-- training 6-class misc classifier --")
-    rng = np.random.default_rng(SEED + 11)
-    X_misc = make_misc_inputs(X_train, n=len(X_train), rng=rng)
-    y_misc = np.full(len(X_misc), 5, dtype=int)
-    X_mc = np.concatenate([X_train, X_misc], axis=0).astype(np.float32)
-    y_mc = np.concatenate([y_train_idx, y_misc], axis=0)
-    perm = rng.permutation(len(X_mc))
-    misc_clf = Classifier(n_out=6, p_drop=0.3)
-    train_classifier(misc_clf, X_mc[perm], y_mc[perm], tag="misc-clf")
-    write_misc_predictions(misc_clf, X_test, y_test, HERE / "misc_clf_softmax.csv")
-
-    # 5. Confidence-head classifier.
+    # 3. Confidence-head classifier (DeVries & Taylor + outlier exposure).
+    # No dropout: the OOD-exposure recipe is sensitive to train/eval shift.
     print("\n-- training classifier with confidence head --")
-    conf_clf = ConfidenceClassifier(n_out=5, p_drop=0.3)
+    conf_clf = ConfidenceClassifier(n_out=5, p_drop=0.0)
     train_confidence_classifier(conf_clf, X_train, y_train_idx, tag="confhead")
     write_confidence_head_preds(conf_clf, X_test, y_test,
                                 HERE / "confidence_head_preds.csv")

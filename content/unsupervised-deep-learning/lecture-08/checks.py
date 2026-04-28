@@ -69,7 +69,7 @@ def check_encode(fn, X, mlp):
         z3 = z3 @ mlp.coefs_[2] + mlp.intercepts_[2]
         z3 = z3 / (np.linalg.norm(z3, axis=1, keepdims=True) + 1e-12)
         if got.shape == z3.shape and _close(got, z3, tol=1e-2):
-            print(f"  {_FAIL} encode: ran one layer too many — that is the classification head")
+            print(f"  {_FAIL} encode: ran one layer too many, that is the classification head")
             print(f"       Hint: stop after coefs_[1]/intercepts_[1]; do not apply coefs_[2].")
             return
 
@@ -148,14 +148,14 @@ def check_attribute_table(attrs_target, attr_names):
     if issues:
         print(f"  {_FAIL} attrs_target shape problems:")
         for s in issues:
-            print(f"       — {s}")
+            print(f"       . {s}")
         return
 
     # Soft sanity check: the two rows should differ. A 0 and a 1 are visually
     # opposite; if the rows are identical the bridge has nothing to work with.
     r0, r1 = list(attrs_target[0]), list(attrs_target[1])
     if r0 == r1:
-        print(f"  {_FAIL} attrs_target: rows for 0 and 1 are identical — they should differ on at least one attribute")
+        print(f"  {_FAIL} attrs_target: rows for 0 and 1 are identical; they should differ on at least one attribute")
         print(f"       Hint: a 0 has a closed loop and no straight strokes; a 1 has a vertical stroke and no loop.")
         return
 
@@ -173,7 +173,7 @@ def check_attribute_table(attrs_target, attr_names):
     if warn:
         print(f"  {_OK} attrs_target accepted, but check these:")
         for w in warn:
-            print(f"       — {w}")
+            print(f"       . {w}")
         return
 
     print(f"  {_OK} attrs_target rows look reasonable for 0 and 1")
@@ -220,7 +220,7 @@ def check_class_centroids(fn, emb, labels):
     if issues:
         print(f"  {_FAIL} class_centroids:")
         for s in issues:
-            print(f"       — {s}")
+            print(f"       . {s}")
         return
 
     # Reference compute and compare.
@@ -286,7 +286,7 @@ def check_attribute_bridge(fn, attrs_source, centroids_source, attrs_target):
     if bad:
         print(f"  {_FAIL} attribute_bridge:")
         for s in bad:
-            print(f"       — {s}")
+            print(f"       . {s}")
         print(f"       Hint: stack source rows in matching order, solve with np.linalg.lstsq, "
               f"apply to target rows, then L2-normalise the result.")
         return
@@ -323,7 +323,7 @@ def check_cosine_classify(fn, query_emb, class_emb_dict, expected):
     argmin_preds = np.array([labels[i] for i in np.argmin(sims, axis=1)])
     if np.array_equal(got_arr, argmin_preds):
         print(f"  {_FAIL} cosine_classify: returned the LEAST similar class")
-        print(f"       Hint: use np.argmax, not np.argmin — high cosine similarity means closer.")
+        print(f"       Hint: use np.argmax, not np.argmin; high cosine similarity means closer.")
         return
 
     print(f"  {_FAIL} cosine_classify: got {list(got_arr)}, expected {list(expected_arr)}")
@@ -338,8 +338,8 @@ def check_contrastive_loss(fn, paired_embs, tau=0.1):
     """Sanity-check the diagonal contrastive loss.
 
     Two cases:
-      (a) identical paired embeddings (perfect alignment) — loss should be small.
-      (b) shuffled "text" side (broken alignment) — loss should be much larger.
+      (a) identical paired embeddings (perfect alignment): loss should be small.
+      (b) shuffled "text" side (broken alignment): loss should be much larger.
     """
     got_aligned = fn(paired_embs, paired_embs, tau)
 
@@ -388,13 +388,13 @@ def check_contrastive_loss(fn, paired_embs, tau=0.1):
             print(f"       Hint: compute cross-entropy in BOTH directions (rows and columns) and average them.")
             return
         print(f"  {_FAIL} contrastive_loss aligned = {float(got_aligned):.4f}, expected ~{ref_aligned:.4f}")
-        print(f"       Hint: use the symmetric InfoNCE — average of row-wise and column-wise cross-entropy.")
+        print(f"       Hint: use the symmetric InfoNCE: average of row-wise and column-wise cross-entropy.")
         return
 
     if got_shuffled <= got_aligned + 0.1:
         print(f"  {_FAIL} contrastive_loss did not increase when pairs were broken "
               f"(aligned {got_aligned:.3f}, shuffled {got_shuffled:.3f})")
-        print(f"       Hint: the diagonal is the correct match — when you shuffle the text side, "
+        print(f"       Hint: the diagonal is the correct match; when you shuffle the text side, "
               f"the loss should rise sharply.")
         return
 
@@ -429,7 +429,7 @@ def check_topk_retrieve(fn, query_emb, all_embs, k, expected):
     asc = np.argsort(sims)[:k]
     if np.array_equal(got_arr, asc):
         print(f"  {_FAIL} topk_retrieve: returned the LEAST similar k")
-        print(f"       Hint: descending order — np.argsort(...)[::-1].")
+        print(f"       Hint: descending order, np.argsort(...)[::-1].")
         return
 
     print(f"  {_FAIL} topk_retrieve: got {list(got_arr)}, expected {list(expected_arr)}")
