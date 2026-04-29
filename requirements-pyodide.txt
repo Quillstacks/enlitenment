@@ -1,0 +1,7 @@
+# Packages to auto-install in the JupyterLite (Pyodide) kernel.
+# Add any pip package here that notebooks import but pyodide doesn't ship by default.
+# The build script injects a %pip install cell into each notebook automatically.
+#
+# Import-name → package-name mapping (only needed when they differ):
+#   sklearn → scikit-learn
+scikit-learn

@@ -8,3 +8,4 @@ __pycache__/
 # Regenerable precompute caches (lecture-07 generator)
 content/unsupervised-deep-learning/lecture-07/_mnist_raw/
 content/unsupervised-deep-learning/lecture-07/mnist_evens_odds.npz
+.env
