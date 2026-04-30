@@ -6,10 +6,10 @@ cd /var/www/enlitenment
 # Fetch latest remote state without merging
 git fetch origin main
 
-LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse origin/main)
+# Only rebuild when remote has commits that local doesn't
+BEHIND=$(git rev-list --count HEAD..origin/main)
 
-if [ "$LOCAL" = "$REMOTE" ]; then
+if [ "$BEHIND" -eq 0 ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') — No changes, skipping build"
     exit 0
 fi
