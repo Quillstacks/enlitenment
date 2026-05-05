@@ -367,11 +367,11 @@ def check_temperature_sample(fn):
     n_trials = 400
 
     rng = np.random.default_rng(0)
-    samples_low = [int(fn(logits, 0.1, rng)) for _ in range(n_trials)]
-    if any(s is None for s in samples_low):
+    probe = fn(logits, 0.1, rng)
+    if probe is None:
         print(f"  {_NONE} temperature_sample: not implemented yet")
         return
-
+    samples_low = [int(probe)] + [int(fn(logits, 0.1, rng)) for _ in range(n_trials - 1)]
     counts_low = np.bincount(samples_low, minlength=len(logits))
     if counts_low.argmax() != 5 or counts_low[5] < 0.85 * n_trials:
         print(f"  {_FAIL} temperature_sample at T=0.1 is not concentrating on the peak")
