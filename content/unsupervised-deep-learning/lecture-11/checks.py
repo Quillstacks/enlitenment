@@ -355,10 +355,11 @@ def check_pick_epsilon_greedy(fn):
 
     # eps = 0.0  -> always argmax
     rng = np.random.default_rng(0)
-    greedy_picks = [int(fn(Q_row, 0.0, rng)) for _ in range(50)]
-    if greedy_picks[0] is None:
+    raw0 = fn(Q_row, 0.0, rng)
+    if raw0 is None:
         print(f"  {_NONE} pick_epsilon_greedy: not implemented yet")
         return
+    greedy_picks = [int(raw0)] + [int(fn(Q_row, 0.0, rng)) for _ in range(49)]
     if not all(p == 1 for p in greedy_picks):
         # Possibly broke ties weirdly; check majority
         from collections import Counter

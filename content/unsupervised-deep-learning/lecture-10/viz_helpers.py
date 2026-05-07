@@ -370,3 +370,502 @@ def show_lf_examples(X, y, lf_outputs, lf_name, n_each=4):
     fig.suptitle(f'{lf_name}', fontsize=10, color=_GOLDEN, y=1.02)
     plt.tight_layout()
     plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🧮  per-example MV vs EM comparison on test images
+# ---------------------------------------------------------------------------
+
+def show_label_model_predictions(X_test, y_test, mv_test, soft_test,
+                                 n_each=4, seed=0):
+    """Side-by-side per-example predictions of majority vote and EM.
+
+    Top row: examples majority vote refused to label (no LF agreed strongly
+    enough), where EM is the only signal. Bottom row: examples majority
+    vote did vote on. Title colour: teal if EM's argmax matches the
+    ground truth, terra if it doesn't.
+    """
+    rng = np.random.default_rng(seed)
+    abstain_idx = np.where(mv_test == ABSTAIN)[0]
+    voted_idx   = np.where(mv_test != ABSTAIN)[0]
+
+    rows = [
+        ('MV abstains', abstain_idx, _TEXT),
+        ('MV votes',    voted_idx,   _GOLDEN),
+    ]
+
+    _, axes = plt.subplots(2, n_each, figsize=(1.6 * n_each, 3.6))
+    for r, (row_label, pool, label_colour) in enumerate(rows):
+        n = min(n_each, len(pool))
+        pick = (rng.choice(pool, size=n, replace=False)
+                if n else np.array([], dtype=int))
+        for c in range(n_each):
+            ax = axes[r, c]
+            if c < n:
+                i = int(pick[c])
+                ax.imshow(X_test[i].reshape(8, 8), cmap='gray_r')
+                true = int(y_test[i])
+                mv = int(mv_test[i])
+                dse = float(soft_test[i])
+                dse_pred = int(dse > 0.5)
+                mv_str = 'abstain' if mv == ABSTAIN else str(mv)
+                col = _ACCENT if dse_pred == true else _TERRA
+                ax.set_title(f'true {true}\nMV  {mv_str}\nEM  {dse:.2f}',
+                             fontsize=8, color=col)
+            ax.set_xticks([]); ax.set_yticks([])
+            for s in ax.spines.values():
+                s.set_visible(False)
+            if c == 0:
+                ax.text(-0.5, 0.5, row_label, transform=ax.transAxes,
+                        fontsize=9, color=label_colour, ha='right', va='center')
+
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🛠️  task hardness: why 4 vs 9 is the confusable pair
+# ---------------------------------------------------------------------------
+
+def show_task_hardness(X, y, n_each=6, seed=0):
+    """Show real digits side by side so the student SEES the confusion.
+
+    Top row: examples labelled 0 (digit 4); bottom row: examples labelled 1 (digit 9).
+    The right-most column shows each class's mean image — the average 4 and the
+    average 9 differ mostly at the top loop, which is exactly the structure
+    ``lf_top_loop`` exploits.
+    """
+    rng = np.random.default_rng(seed)
+    fig, axes = plt.subplots(2, n_each + 1,
+                             figsize=(1.2 * (n_each + 1), 2.8))
+
+    classes = [(0, 'class 0  (digit 4)', _TERRA),
+               (1, 'class 1  (digit 9)', _ACCENT)]
+
+    for r, (c, label, colour) in enumerate(classes):
+        idx = rng.choice(np.where(y == c)[0],
+                         size=min(n_each, int((y == c).sum())),
+                         replace=False)
+        for k in range(n_each):
+            ax = axes[r, k]
+            if k < len(idx):
+                ax.imshow(X[idx[k]].reshape(8, 8), cmap='gray_r')
+            ax.set_xticks([]); ax.set_yticks([])
+            for s in ax.spines.values(): s.set_visible(False)
+            if k == 0:
+                ax.text(-0.45, 0.5, label, transform=ax.transAxes,
+                        fontsize=9, color=colour, ha='right', va='center')
+
+        # Mean image in the rightmost column
+        ax = axes[r, n_each]
+        mean_img = X[y == c].mean(axis=0).reshape(8, 8)
+        ax.imshow(mean_img, cmap='gray_r')
+        ax.set_xticks([]); ax.set_yticks([])
+        for s in ax.spines.values(): s.set_visible(False)
+        if r == 0:
+            ax.set_title('class mean', fontsize=8, color=_GOLDEN)
+
+    fig.suptitle('the labelling problem: 4s and 9s share an open/closed top loop',
+                 fontsize=10, color=_GOLDEN, y=1.04)
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🛠️  the label matrix L itself, as a heatmap
+# ---------------------------------------------------------------------------
+
+def plot_label_matrix(L, lf_names, max_rows=80, sort_rows=True,
+                      title='Label matrix L  (rows = pool examples, columns = LFs)'):
+    """Render the (n_samples, n_lfs) matrix as a categorical heatmap.
+
+    Three colours: red = vote 0, teal = vote 1, dim = ABSTAIN.  Sorting rows
+    by total non-abstain votes makes the coverage structure visible at a glance:
+    the top of the figure has rows where every LF fired, the bottom has rows
+    almost no LF covered.
+    """
+    from matplotlib.colors import ListedColormap, BoundaryNorm
+
+    L = np.asarray(L)
+    if sort_rows:
+        order = np.argsort(-(L != ABSTAIN).sum(axis=1))
+        L = L[order]
+    if max_rows is not None and L.shape[0] > max_rows:
+        # Even sampling so the row order (high-coverage at top, low at bottom) is preserved
+        idx = np.linspace(0, L.shape[0] - 1, max_rows).astype(int)
+        L = L[idx]
+
+    # Map {-1, 0, 1} -> {0, 1, 2} for ListedColormap
+    M = (L + 1).astype(int)   # ABSTAIN(-1)->0, vote 0->1, vote 1->2
+    cmap = ListedColormap(['#1d2c33', _TERRA, _ACCENT])
+    norm = BoundaryNorm([-0.5, 0.5, 1.5, 2.5], cmap.N)
+
+    n_lfs = L.shape[1]
+    fig, ax = plt.subplots(figsize=(1.0 + 0.7 * n_lfs, 5.0))
+    ax.imshow(M, cmap=cmap, norm=norm, aspect='auto', interpolation='nearest')
+    ax.set_xticks(range(n_lfs))
+    ax.set_xticklabels(lf_names, fontsize=8, rotation=20, ha='right')
+    ax.set_yticks([])
+    ax.set_xlabel('labelling function')
+    ax.set_ylabel(f'pool example  ({L.shape[0]} shown, sorted by # votes)')
+    ax.set_title(title, fontsize=10, color=_GOLDEN, loc='left')
+    for s in ax.spines.values(): s.set_visible(False)
+    ax.tick_params(length=0)
+
+    # Legend
+    from matplotlib.patches import Patch
+    handles = [
+        Patch(facecolor=_ACCENT,  label='vote = 1'),
+        Patch(facecolor=_TERRA,   label='vote = 0'),
+        Patch(facecolor='#1d2c33', edgecolor=_BORDER, label='ABSTAIN'),
+    ]
+    ax.legend(handles=handles, frameon=False, labelcolor=_TEXT,
+              loc='upper right', bbox_to_anchor=(1.02, 1.10), ncol=3, fontsize=8)
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🛠️  precision-coverage scatter
+# ---------------------------------------------------------------------------
+
+def plot_coverage_accuracy(coverages, accuracies, lf_names,
+                           title='Coverage vs accuracy  (each dot = one LF)'):
+    """The precision-coverage trade-off, one dot per LF."""
+    coverages = np.asarray(coverages, dtype=float)
+    accuracies = np.asarray(accuracies, dtype=float)
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.axhline(0.5, color=_TEXT, linewidth=0.6, alpha=0.4, linestyle='--')
+    ax.text(0.02, 0.51, 'random  (50%)', fontsize=8, color=_TEXT, alpha=0.8)
+    ax.axhline(1.0, color=_TEXT, linewidth=0.6, alpha=0.3, linestyle=':')
+    ax.text(0.02, 1.01, 'perfect  (100%)', fontsize=8, color=_TEXT, alpha=0.8)
+
+    # Color each LF differently for visual identity
+    palette = [_ACCENT, _GOLDEN, _TERRA, _ORANGE, _SAGE, _STEEL, _LAVENDER]
+    for i, (c, a, name) in enumerate(zip(coverages, accuracies, lf_names)):
+        if np.isnan(a):
+            continue
+        col = palette[i % len(palette)]
+        ax.scatter([c], [a], s=110, color=col, edgecolors='none', zorder=3)
+        ax.annotate(name, (c, a), xytext=(8, 0), textcoords='offset points',
+                    fontsize=9, color=col, va='center')
+
+    ax.set_xlim(0, 1.05); ax.set_ylim(0.35, 1.08)
+    ax.set_xlabel('coverage  (fraction of inputs the LF voted on)')
+    ax.set_ylabel('accuracy  (fraction correct when it voted)')
+    ax.set_title(title, fontsize=10, color=_GOLDEN, loc='left')
+    tufte_axis(ax)
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🧮  EM label model (black box)
+# ---------------------------------------------------------------------------
+
+def _em_label_model_trace(L, n_iters=30, init_alpha=0.7):
+    """One-coin agreement-based label model fitted by EM.
+
+    Returns (history, soft_pos):
+      history  : (n_iters + 1, n_lfs) array of per-LF alpha at each iteration
+      soft_pos : (n_samples,) final P(y = 1 | L) for every row.
+    """
+    L = np.asarray(L)
+    n, n_lfs = L.shape
+    alphas = np.full(n_lfs, init_alpha, dtype=np.float64)
+    history = [alphas.copy()]
+    soft_pos = np.full(n, 0.5)
+    soft_history = [soft_pos.copy()]
+    for _ in range(n_iters):
+        log_odds = np.zeros(n)
+        for i in range(n_lfs):
+            a = float(np.clip(alphas[i], 1e-3, 1 - 1e-3))
+            vote = L[:, i]
+            log_odds += np.where(vote == 1, np.log(a) - np.log(1 - a), 0.0)
+            log_odds += np.where(vote == 0, np.log(1 - a) - np.log(a), 0.0)
+        soft_pos = 1.0 / (1.0 + np.exp(-log_odds))
+        for i in range(n_lfs):
+            mask = L[:, i] != ABSTAIN
+            if not mask.any():
+                continue
+            agree = np.where(L[mask, i] == 1, soft_pos[mask], 1.0 - soft_pos[mask])
+            alphas[i] = float(np.clip(agree.mean(), 0.5 + 1e-3, 1 - 1e-3))
+        history.append(alphas.copy())
+        soft_history.append(soft_pos.copy())
+    return np.array(history), soft_pos, np.array(soft_history)
+
+
+def em_label_model(L, n_iters: int = 30):
+    """Black-box agreement-based label model.
+
+    Takes the label matrix ``L`` of shape ``(n_samples, n_lfs)`` and returns:
+      alphas   : (n_lfs,) each LF's inferred accuracy
+      soft_pos : (n_samples,) P(y = 1 | L) for every example
+
+    The implementation is a one-coin model fitted by expectation-maximisation,
+    initialised at alpha = 0.7 to break the symmetric saddle at 0.5. Students
+    consume this as a black box; the convergence and posterior plots in the
+    notebook show what it produces.
+    """
+    history, soft_pos, _ = _em_label_model_trace(L, n_iters=n_iters)
+    return history[-1], soft_pos
+
+
+def plot_em_label_model_trace(L, lf_names, n_iters=30, dev_accuracies=None,
+                              title='EM label model: per-LF accuracy estimate over iterations'):
+    """Plot how each LF's recovered accuracy moves over EM iterations.
+
+    With no labelled training data, EM still converges to roughly the right
+    per-LF accuracies, driven only by the agreement structure of L.  If
+    ``dev_accuracies`` is provided (the empirical accuracies on the dev set),
+    they are drawn as horizontal references — the line that EM is approaching.
+    """
+    history, _, _ = _em_label_model_trace(L, n_iters=n_iters)
+    n_lfs = history.shape[1]
+    palette = [_ACCENT, _GOLDEN, _TERRA, _ORANGE, _SAGE, _STEEL, _LAVENDER]
+
+    fig, ax = plt.subplots(figsize=(8, 3.6))
+    xs = np.arange(history.shape[0])
+    for i in range(n_lfs):
+        col = palette[i % len(palette)]
+        ax.plot(xs, history[:, i], color=col, marker='o', markersize=3,
+                linewidth=1.4, label=f'{lf_names[i]}', markeredgecolor='none')
+        if dev_accuracies is not None and not np.isnan(dev_accuracies[i]):
+            ax.axhline(dev_accuracies[i], color=col, linewidth=0.6,
+                       linestyle='--', alpha=0.5)
+    ax.axhline(0.5, color=_TEXT, linewidth=0.4, alpha=0.4)
+    ax.set_xlabel('EM iteration')
+    ax.set_ylabel('inferred accuracy  (alpha)')
+    ax.set_title(title, fontsize=10, color=_GOLDEN, loc='left')
+    ax.legend(frameon=False, labelcolor=_TEXT, loc='lower right', fontsize=9)
+    if dev_accuracies is not None:
+        ax.text(0.02, 0.96, 'dashed line = empirical accuracy on dev set',
+                transform=ax.transAxes, fontsize=8, color=_TEXT, alpha=0.7,
+                va='top')
+    tufte_axis(ax)
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🧮  soft posterior histogram
+# ---------------------------------------------------------------------------
+
+def plot_soft_posteriors(soft_pos, y_true,
+                         title='Soft posterior P(y=1 | L) per pool example'):
+    """Histogram of the label model's per-example soft posterior, split by truth.
+
+    A healthy label model concentrates probability near 0 for true-0 examples
+    and near 1 for true-1 examples, with a thin band of genuine uncertainty
+    in between.  Examples in the middle band are exactly the ones an active
+    learner would query first.
+    """
+    soft_pos = np.asarray(soft_pos)
+    y_true   = np.asarray(y_true)
+
+    fig, ax = plt.subplots(figsize=(8, 3.4))
+    bins = np.linspace(0, 1, 21)
+    ax.hist(soft_pos[y_true == 0], bins=bins, color=_TERRA,
+            alpha=0.65, edgecolor='none', label='true class 0')
+    ax.hist(soft_pos[y_true == 1], bins=bins, color=_ACCENT,
+            alpha=0.65, edgecolor='none', label='true class 1')
+    ax.axvline(0.5, color=_TEXT, linewidth=0.6, alpha=0.5, linestyle='--')
+    ax.text(0.51, ax.get_ylim()[1] * 0.92, 'argmax threshold',
+            fontsize=8, color=_TEXT, alpha=0.7)
+    ax.set_xlabel('soft posterior P(y=1 | L)')
+    ax.set_ylabel('count')
+    ax.set_title(title, fontsize=10, color=_GOLDEN, loc='left')
+    ax.legend(frameon=False, labelcolor=_TEXT, loc='upper center')
+    tufte_axis(ax)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_em_soft_pos_evolution(L, y_true, n_iters: int = 30,
+                               snapshots=(0, 2, 5, 30),
+                               title='Soft posterior P(y=1 | L) sharpening over EM iterations'):
+    """Show how the per-example soft posterior moves from flat (iter 0) toward
+    bimodal (iter ``n_iters``).
+
+    One histogram panel per snapshot iteration, split by held-back ground truth.
+    At iteration 0 every example sits at 0.5 (the flat prior); after a few
+    iterations the two classes pull apart. Pedagogical companion to the
+    per-LF accuracy trace, showing the same EM fit from the *example* side
+    rather than the *LF* side. Each panel scales its own y-axis so the
+    iteration-0 spike at 0.5 does not dwarf the spread-out later panels.
+    """
+    _, _, soft_history = _em_label_model_trace(L, n_iters=n_iters)
+    y_true = np.asarray(y_true)
+    snapshots = [int(s) for s in snapshots if 0 <= int(s) <= n_iters]
+
+    n_panels = len(snapshots)
+    fig, axes = plt.subplots(1, n_panels, figsize=(3.0 * n_panels, 3.0),
+                             sharey=False)
+    if n_panels == 1:
+        axes = [axes]
+
+    bins = np.linspace(0, 1, 21)
+    for ax, k in zip(axes, snapshots):
+        soft = soft_history[k]
+        ax.hist(soft[y_true == 0], bins=bins, color=_TERRA,
+                alpha=0.65, edgecolor='none', label='true class 0')
+        ax.hist(soft[y_true == 1], bins=bins, color=_ACCENT,
+                alpha=0.65, edgecolor='none', label='true class 1')
+        ax.axvline(0.5, color=_TEXT, linewidth=0.4, alpha=0.4, linestyle='--')
+        ax.set_title(f'iter {k}', fontsize=10, color=_TEXT, loc='left')
+        ax.set_xlabel('P(y=1 | L)')
+        tufte_axis(ax)
+
+        # Iter 0 is one tall bar at 0.5 — call that out so the visual
+        # is unmistakable.
+        if k == 0:
+            n_total = len(soft)
+            ax.text(0.5, 0.92,
+                    f'all {n_total} examples\nstart at 0.5',
+                    transform=ax.transAxes, ha='center', va='top',
+                    fontsize=8, color=_TEXT, alpha=0.85)
+
+    axes[0].set_ylabel('count')
+    axes[-1].legend(frameon=False, labelcolor=_TEXT, loc='upper center',
+                    fontsize=8)
+    fig.suptitle(title, fontsize=10, color=_GOLDEN, x=0.02, ha='left')
+    plt.tight_layout(rect=(0, 0, 1, 0.94))
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🎓  verifier-generator gap as a bar chart
+# ---------------------------------------------------------------------------
+
+def plot_verifier_generator_gap(L, X, y, predict_fn, lf_total=None,
+                                title='End-model accuracy vs number of LFs that fired'):
+    """Bar chart of end-model accuracy vs # LFs that fired on each example.
+
+    The verifier-generator gap is the chapter punchline: even on examples no
+    LF fired on, the trained end model can still classify them correctly
+    because it operates on the input features rather than the LF outputs.
+    """
+    L = np.asarray(L)
+    n_votes = (L != ABSTAIN).sum(axis=1)
+    if lf_total is None:
+        lf_total = L.shape[1]
+
+    preds = (predict_fn(X) > 0.5).astype(int)
+    correct = (preds == y).astype(int)
+
+    buckets = list(range(lf_total + 1))
+    accs   = []
+    counts = []
+    for k in buckets:
+        m = n_votes == k
+        counts.append(int(m.sum()))
+        accs.append(float(correct[m].mean()) if m.any() else 0.0)
+
+    fig, ax = plt.subplots(figsize=(8, 3.6))
+    palette = [_TERRA, _ORANGE, _GOLDEN, _ACCENT, _SAGE]
+    bars = ax.bar(buckets, accs,
+                  color=[palette[min(k, len(palette) - 1)] for k in buckets],
+                  edgecolor='none')
+    for k, (b, c) in enumerate(zip(bars, counts)):
+        if c == 0:
+            ax.text(b.get_x() + b.get_width() / 2, 0.02, 'no examples',
+                    ha='center', fontsize=7, color=_TEXT, alpha=0.6)
+        else:
+            ax.text(b.get_x() + b.get_width() / 2, b.get_height() + 0.015,
+                    f'{c}', ha='center', fontsize=8, color=_TEXT)
+    ax.axhline(0.5, color=_TEXT, linewidth=0.4, alpha=0.4)
+
+    ax.set_xticks(buckets)
+    ax.set_xlabel('# LFs that voted on the example')
+    ax.set_ylabel('end-model test accuracy')
+    ax.set_ylim(0, 1.08)
+    ax.set_title(title, fontsize=10, color=_GOLDEN, loc='left')
+    tufte_axis(ax)
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# ⚖️  judge effect: how the soft posterior shifts when the judge is added
+# ---------------------------------------------------------------------------
+
+def plot_judge_effect(soft_before, soft_after, y_true,
+                      title='Adding the judge: per-example soft posterior shift'):
+    """Per-example scatter of soft posterior before vs after adding the judge.
+
+    Points off the diagonal moved.  Up-and-right means the judge confirmed
+    class 1; down-and-left means it confirmed class 0; movement against the
+    true-label colour is where the judge OVERRULED the rest of the LFs.
+    """
+    soft_before = np.asarray(soft_before)
+    soft_after  = np.asarray(soft_after)
+    y_true      = np.asarray(y_true)
+
+    fig, ax = plt.subplots(figsize=(5.6, 5.6))
+    ax.plot([0, 1], [0, 1], color=_TEXT, linewidth=0.6, alpha=0.5,
+            linestyle='--', label='unchanged')
+    ax.scatter(soft_before[y_true == 0], soft_after[y_true == 0],
+               s=22, color=_TERRA, alpha=0.7, edgecolors='none',
+               label='true class 0')
+    ax.scatter(soft_before[y_true == 1], soft_after[y_true == 1],
+               s=22, color=_ACCENT, alpha=0.7, edgecolors='none',
+               label='true class 1')
+    ax.set_xlim(-0.02, 1.02); ax.set_ylim(-0.02, 1.02)
+    ax.set_xlabel('soft posterior  (3 LFs)')
+    ax.set_ylabel('soft posterior  (3 LFs + judge)')
+    ax.set_title(title, fontsize=10, color=_GOLDEN, loc='left')
+    ax.legend(frameon=False, labelcolor=_TEXT, loc='upper left')
+    tufte_axis(ax)
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
+# 🔍  active-learning picks: show the digits the picker actually chose
+# ---------------------------------------------------------------------------
+
+def show_active_learning_picks(X, queried_indices, y, soft_pos=None,
+                               n_show=8, title=None):
+    """Render the first n_show digits the active learner asked the oracle for.
+
+    With uncertainty sampling, these *should* be the visually-confusable
+    examples the LFs disagreed on most.  If ``soft_pos`` is provided, each
+    picked example is annotated with its label-model posterior at pick time.
+    """
+    if title is None:
+        title = (f'first {min(n_show, len(queried_indices))} examples picked by uncertainty sampling'
+                 '   (most uncertain first)')
+    n = min(n_show, len(queried_indices))
+    if n == 0:
+        print('  no queries made — picker returned None?')
+        return
+
+    cols = min(n, 8)
+    rows = int(np.ceil(n / cols))
+    fig, axes = plt.subplots(rows, cols, figsize=(1.4 * cols, 1.7 * rows))
+    if rows * cols == 1:
+        axes = np.array([[axes]])
+    elif rows == 1:
+        axes = axes.reshape(1, -1)
+
+    for k, idx in enumerate(queried_indices[:n]):
+        ax = axes[k // cols, k % cols]
+        ax.imshow(X[idx].reshape(8, 8), cmap='gray_r')
+        true_lab = int(y[idx])
+        if soft_pos is not None:
+            ax.set_title(f'#{k+1}  true {true_lab}\np={soft_pos[idx]:.2f}',
+                         fontsize=8, color=_GOLDEN if true_lab == 1 else _TERRA)
+        else:
+            ax.set_title(f'#{k+1}  true {true_lab}',
+                         fontsize=8, color=_GOLDEN if true_lab == 1 else _TERRA)
+        ax.set_xticks([]); ax.set_yticks([])
+        for s in ax.spines.values(): s.set_visible(False)
+
+    # Hide unused axes
+    for k in range(n, rows * cols):
+        axes[k // cols, k % cols].axis('off')
+
+    fig.suptitle(title, fontsize=10, color=_GOLDEN, y=1.02)
+    plt.tight_layout()
+    plt.show()

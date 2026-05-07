@@ -15,6 +15,68 @@ def _close(a, b, tol=_TOL):
 
 
 # ---------------------------------------------------------------------------
+# 🛠️  lf_top_loop(X)
+# ---------------------------------------------------------------------------
+def check_lf_top_loop(fn):
+    """Verify a student-built region-mean LF on the seed=0 train + dev splits.
+
+    The contract is intentionally loose: any region with a real signal is fine.
+    The checker enforces the LF *shape* (output type, ABSTAIN band, dev accuracy)
+    rather than a specific region or threshold pair.
+    """
+    from viz_helpers import load_binary_digits
+    X, _, _, _, X_dev, y_dev = load_binary_digits(seed=0)
+
+    got = fn(X)
+    if got is None:
+        print(f"  {_NONE} lf_top_loop: not implemented yet "
+              f"(expected length-{len(X)} array of votes/abstains)")
+        return
+
+    got = np.asarray(got)
+    if got.shape != (len(X),):
+        print(f"  {_FAIL} lf_top_loop: shape {got.shape}, expected {(len(X),)}")
+        print(f"       Hint: return one vote per row of X.")
+        return
+
+    if not np.isin(got, [0, 1, ABSTAIN]).all():
+        bad = sorted({int(v) for v in np.unique(got)} - {0, 1, ABSTAIN})
+        print(f"  {_FAIL} lf_top_loop: returned values outside {{0, 1, ABSTAIN}}: {bad}")
+        print(f"       Hint: votes are 0 (digit 4), 1 (digit 9), or ABSTAIN (-1). "
+              f"Initialise the output with np.full(len(X), ABSTAIN, dtype=int).")
+        return
+
+    coverage = float((got != ABSTAIN).mean())
+    if coverage == 0.0:
+        print(f"  {_FAIL} lf_top_loop: abstains on every example (coverage 0%)")
+        print(f"       Hint: your thresholds bracket the entire data. Widen the vote bands.")
+        return
+    if coverage > 0.99:
+        print(f"  {_FAIL} lf_top_loop: never abstains (coverage {coverage:.0%})")
+        print(f"       Hint: an LF should ABSTAIN when the region's intensity is "
+              f"in the middle. Leave a band between your two thresholds.")
+        return
+
+    got_dev = np.asarray(fn(X_dev))
+    mask = got_dev != ABSTAIN
+    if not mask.any():
+        print(f"  {_FAIL} lf_top_loop: never fires on the 20-example dev set")
+        print(f"       Hint: relax your thresholds so the LF fires on some dev rows; "
+              f"otherwise lf_empirical_accuracy can't read off its accuracy.")
+        return
+
+    dev_acc = float((got_dev[mask] == y_dev[mask]).mean())
+    if dev_acc < 0.7:
+        print(f"  {_FAIL} lf_top_loop: dev accuracy {dev_acc:.0%} (< 70%)")
+        print(f"       Hint: check show_task_hardness output. The class means differ "
+              f"in the top-centre rows (rows 0:2, cols 2:6); pick a region with real signal "
+              f"and make sure your label assignment isn't flipped (1 = digit 9, 0 = digit 4).")
+        return
+
+    print(f"  {_OK} lf_top_loop: coverage {coverage:.0%}, dev accuracy {dev_acc:.0%}")
+
+
+# ---------------------------------------------------------------------------
 # 🛠️  lf_coverage(L)
 # ---------------------------------------------------------------------------
 def check_lf_coverage(fn):
