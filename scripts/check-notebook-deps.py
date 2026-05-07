@@ -11,41 +11,9 @@ import re
 import sys
 from pathlib import Path
 
-# Python standard-library top-level names (3.11+).  Not exhaustive for every
-# edge-case, but covers everything our notebooks could plausibly import.
-STDLIB = {
-    "abc", "aifc", "argparse", "array", "ast", "asynchat", "asyncio",
-    "asyncore", "atexit", "audioop", "base64", "bdb", "binascii", "binhex",
-    "bisect", "builtins", "bz2", "calendar", "cgi", "cgitb", "chunk",
-    "cmath", "cmd", "code", "codecs", "codeop", "collections", "colorsys",
-    "compileall", "concurrent", "configparser", "contextlib", "contextvars",
-    "copy", "copyreg", "cProfile", "crypt", "csv", "ctypes", "curses",
-    "dataclasses", "datetime", "dbm", "decimal", "difflib", "dis",
-    "distutils", "doctest", "email", "encodings", "enum", "errno",
-    "faulthandler", "fcntl", "filecmp", "fileinput", "fnmatch", "fractions",
-    "ftplib", "functools", "gc", "getopt", "getpass", "gettext", "glob",
-    "graphlib", "grp", "gzip", "hashlib", "heapq", "hmac", "html", "http",
-    "idlelib", "imaplib", "imghdr", "imp", "importlib", "inspect", "io",
-    "ipaddress", "itertools", "json", "keyword", "lib2to3", "linecache",
-    "locale", "logging", "lzma", "mailbox", "mailcap", "marshal", "math",
-    "mimetypes", "mmap", "modulefinder", "multiprocessing", "netrc",
-    "nis", "nntplib", "numbers", "operator", "optparse", "os", "ossaudiodev",
-    "pathlib", "pdb", "pickle", "pickletools", "pipes", "pkgutil",
-    "platform", "plistlib", "poplib", "posixpath", "pprint", "profile",
-    "pstats", "pty", "pwd", "py_compile", "pyclbr", "pydoc", "queue",
-    "quopri", "random", "re", "readline", "reprlib", "resource", "rlcompleter",
-    "runpy", "sched", "secrets", "select", "selectors", "shelve", "shlex",
-    "shutil", "signal", "site", "smtpd", "smtplib", "sndhdr", "socket",
-    "socketserver", "sqlite3", "ssl", "stat", "statistics", "string",
-    "stringprep", "struct", "subprocess", "sunau", "symtable", "sys",
-    "sysconfig", "syslog", "tabnanny", "tarfile", "telnetlib", "tempfile",
-    "termios", "test", "textwrap", "threading", "time", "timeit", "tkinter",
-    "token", "tokenize", "tomllib", "trace", "traceback", "tracemalloc",
-    "tty", "turtle", "turtledemo", "types", "typing", "unicodedata",
-    "unittest", "urllib", "uu", "uuid", "venv", "warnings", "wave",
-    "weakref", "webbrowser", "winreg", "winsound", "wsgiref", "xdrlib",
-    "xml", "xmlrpc", "zipapp", "zipfile", "zipimport", "zlib",
-    # Also treat IPython / Jupyter magics as available
+# Canonical Python stdlib list from the running interpreter (3.10+), plus
+# IPython / Jupyter / pyodide names that are always available in the kernel.
+STDLIB = set(sys.stdlib_module_names) | {
     "IPython", "ipywidgets", "piplite", "micropip", "pyodide", "pyodide_js",
     "js",
 }
@@ -175,7 +143,10 @@ def inject_pip_install(nb_path: Path, packages: list[str]) -> bool:
     # Find the first code cell and prepend the install line into it
     for cell in nb.get("cells", []):
         if cell["cell_type"] == "code":
-            cell["source"] = [pip_line + "\n"] + cell["source"]
+            existing = cell["source"]
+            if isinstance(existing, str):
+                existing = [existing]
+            cell["source"] = [pip_line + "\n"] + existing
             break
 
     with open(nb_path, "w") as f:

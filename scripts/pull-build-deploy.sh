@@ -44,5 +44,9 @@ mkdir -p _output/landing
 cp landing/index.html _output/landing/index.html
 cp landing/favicon.svg _output/landing/favicon.svg
 
+# Record the commit that was successfully built — used by check-and-deploy.sh
+# to detect a stale or failed deploy and retry.
+git rev-parse HEAD > _output/.deployed-commit
+
 echo "$(date '+%Y-%m-%d %H:%M:%S') — Done"
 discord_notify "✅ **enlitenment deployed** — \`$COMMIT\`\n$(date '+%Y-%m-%d %H:%M:%S')"
