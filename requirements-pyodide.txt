@@ -5,3 +5,5 @@
 # Import-name → package-name mapping (only needed when they differ):
 #   sklearn → scikit-learn
 scikit-learn
+scipy
+matplotlib

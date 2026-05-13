@@ -20,7 +20,7 @@ STDLIB = set(sys.stdlib_module_names) | {
 
 # Packages bundled with pyodide and always available without %pip install.
 PYODIDE_BUILTINS = {
-    "numpy", "matplotlib", "pandas", "scipy", "sympy", "networkx",
+    "numpy", "pandas", "sympy", "networkx",
     "PIL", "Pillow", "cycler", "dateutil", "pyparsing", "pytz", "six",
     "packaging", "kiwisolver", "certifi", "charset_normalizer", "idna",
     "requests",
